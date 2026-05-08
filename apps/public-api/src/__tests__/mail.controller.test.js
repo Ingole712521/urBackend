@@ -186,9 +186,8 @@ describe('mail.controller', () => {
             attemptsMade: 3
         };
 
-        if (failedHandler) {
-            await failedHandler(mockJob, new Error("Terminal failure"));
-        }
+        expect(failedHandler).toBeDefined();
+        await failedHandler(mockJob, new Error("Terminal failure"));
 
         expect(mockRedis.eval).toHaveBeenCalledWith(
             expect.any(String), 1, 'project:mail:count:proj_1:2026-05'
@@ -222,9 +221,8 @@ describe('mail.controller', () => {
             attemptsMade: 1 // Not terminal yet
         };
 
-        if (failedHandler) {
-            await failedHandler(mockJob, new Error("Temporary failure"));
-        }
+        expect(failedHandler).toBeDefined();
+        await failedHandler(mockJob, new Error("Temporary failure"));
 
         expect(mockRedis.eval).not.toHaveBeenCalled();
     });
