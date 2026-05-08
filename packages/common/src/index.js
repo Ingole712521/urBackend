@@ -24,8 +24,6 @@ const Webhook = require("./models/Webhook");
 const WebhookDelivery = require("./models/WebhookDelivery");
 const ProRequest = require("./models/ProRequest");
 const ApiAnalytics = require("./models/ApiAnalytics");
-const PlatformEvent = require("./models/PlatformEvent");
-const DeveloperActivity = require("./models/DeveloperActivity");
 
 // Queues
 const { authEmailQueue, initAuthEmailWorker } = require("./queues/authEmailQueue");
@@ -37,16 +35,6 @@ const {
   initWebhookWorker,
   generateSignature,
 } = require("./queues/webhookQueue");
-const {
-  activityRollupQueue,
-  scheduleActivityRollup,
-  initActivityRollupWorker,
-} = require("./queues/activityRollupQueue");
-const {
-  reliabilityAlertQueue,
-  scheduleReliabilityAlert,
-  initReliabilityAlertWorker,
-} = require("./queues/reliabilityAlertQueue");
 
 // Middleware
 const checkAuthEnabled = require('./middleware/checkAuthEnabled')
@@ -106,6 +94,7 @@ const { validateData, validateUpdateData } = require("./utils/validateData");
 const sessionManager = require("./utils/session.manager");
 const planLimits = require("./utils/planLimits");
 const AppError = require("./utils/AppError");
+const { checkLockout, recordFailedAttempt, clearLockout } = require("./utils/loginLockout");
 
 module.exports = {
   connectDB,
@@ -191,12 +180,7 @@ module.exports = {
   getPresignedUploadUrl,
   verifyUploadedFile,
   ApiAnalytics,
-  PlatformEvent,
-  DeveloperActivity,
-  activityRollupQueue,
-  scheduleActivityRollup,
-  initActivityRollupWorker,
-  reliabilityAlertQueue,
-  scheduleReliabilityAlert,
-  initReliabilityAlertWorker,
+  checkLockout,
+  recordFailedAttempt,
+  clearLockout,
 };

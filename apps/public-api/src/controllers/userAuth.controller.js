@@ -6,6 +6,7 @@ const crypto = require('crypto');
 const {redis} = require('@urbackend/common');
 const {Project} = require('@urbackend/common');
 const { authEmailQueue } = require('@urbackend/common');
+const { checkLockout, recordFailedAttempt, clearLockout } = require('@urbackend/common');
 const { getRefreshSession, persistRefreshSession, revokeSessionChain } = require('@urbackend/common');
 const { loginSchema, userSignupSchema, resetPasswordSchema, onlyEmailSchema, verifyOtpSchema, changePasswordSchema, sanitize } = require('@urbackend/common');
 const { getConnection } = require('@urbackend/common');
@@ -1051,6 +1052,14 @@ module.exports.login = async (req, res) => {
         const project = req.project;
         const { email, password } = loginSchema.parse(req.body);
         const normalizedEmail = email.toLowerCase().trim();
+        const projectId = String(project._id);
+
+        const lockStatus = await checkLockout(projectId, normalizedEmail);
+        if (lockStatus.locked) {
+            return res.status(423).json({
+                error: `Account temporarily locked. Try again in ${lockStatus.retryAfterSeconds} seconds.`
+            });
+        }
 
         const usersColConfig = project.collections.find(c => c.name === 'users');
         if (!usersColConfig) return res.status(404).json({ error: "Auth collection not found" });
@@ -1060,10 +1069,28 @@ module.exports.login = async (req, res) => {
 
         const user = await Model.findOne({ email: normalizedEmail }).select('+password');
 
-        if (!user) return res.status(400).json({ error: "Invalid email or password" });
+        if (!user) {
+            const failedStatus = await recordFailedAttempt(projectId, normalizedEmail);
+            if (failedStatus.locked) {
+                return res.status(423).json({
+                    error: `Account temporarily locked. Try again in ${failedStatus.retryAfterSeconds} seconds.`
+                });
+            }
+            return res.status(400).json({ error: "Invalid email or password" });
+        }
 
         const validPass = await bcrypt.compare(password, user.password);
-        if (!validPass) return res.status(400).json({ error: "Invalid email or password" });
+        if (!validPass) {
+            const failedStatus = await recordFailedAttempt(projectId, normalizedEmail);
+            if (failedStatus.locked) {
+                return res.status(423).json({
+                    error: `Account temporarily locked. Try again in ${failedStatus.retryAfterSeconds} seconds.`
+                });
+            }
+            return res.status(400).json({ error: "Invalid email or password" });
+        }
+
+        await clearLockout(projectId, normalizedEmail);
 
         const issuedTokens = await issueAuthTokens({
             project,

@@ -69,6 +69,9 @@ jest.mock('@urbackend/common', () => {
         sanitize: jest.fn((value) => value),
         getConnection: jest.fn().mockResolvedValue({}),
         getCompiledModel: jest.fn(() => mockUsersModel),
+        checkLockout: jest.fn().mockResolvedValue({ locked: false, retryAfterSeconds: 0 }),
+        recordFailedAttempt: jest.fn().mockResolvedValue({ locked: false, retryAfterSeconds: 0, attempts: 1 }),
+        clearLockout: jest.fn().mockResolvedValue(undefined),
         decrypt: jest.fn((encrypted) => {
             if (!encrypted?.encrypted) return null;
             if (encrypted.encrypted === 'github') return 'github_secret';

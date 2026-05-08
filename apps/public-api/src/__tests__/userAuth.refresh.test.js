@@ -73,6 +73,9 @@ jest.mock('@urbackend/common', () => {
         getConnection: jest.fn().mockResolvedValue({}),
         getCompiledModel: jest.fn(() => mockModel),
         __mockModel: mockModel,
+        checkLockout: jest.fn().mockResolvedValue({ locked: false, retryAfterSeconds: 0 }),
+        recordFailedAttempt: jest.fn().mockResolvedValue({ locked: false, retryAfterSeconds: 0, attempts: 1 }),
+        clearLockout: jest.fn().mockResolvedValue(undefined),
         // session manager exports
         getRefreshSession: jest.fn(),
         persistRefreshSession: jest.fn().mockResolvedValue(undefined),
