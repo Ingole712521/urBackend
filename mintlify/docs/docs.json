@@ -12,6 +12,11 @@
     "dark": "https://media.brand.dev/4b788915-4c6f-48d5-b961-63e90c4e3c5e.png"
   },
   "favicon": "https://media.brand.dev/98c8a636-fed2-4095-a2d6-1ed768aca5dd.png",
+  "seo": {
+    "metatags": {
+      "google-site-verification": "o5KNQ9R-ummCVpBGTiPWtBLvDPdVm-uxMuIQXmj3mlU"
+    }
+  },
   "navbar": {
     "primary": {
       "type": "github",
