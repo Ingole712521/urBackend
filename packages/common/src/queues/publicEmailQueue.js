@@ -18,9 +18,7 @@ const initPublicEmailWorker = () => {
     // Initialize Worker with Rate Limiting (10 per second to respect Resend limits)
     worker = new Worker('public-email-queue', async (job) => {
         const { projectId, payload, usingByok, consumedQuotaKey } = job.data;
-        
-        try {
-        
+
         let clientKey = process.env.RESEND_API_KEY_2 || process.env.RESEND_API_KEY;
         let fromAddress = process.env.EMAIL_FROM || "urBackend <urbackend@apps.bitbros.in>";
 
@@ -31,8 +29,8 @@ const initPublicEmailWorker = () => {
                     const decrypted = decrypt(project.resendApiKey);
                     if (typeof decrypted === 'string' && decrypted.trim().length > 0) {
                         clientKey = decrypted.trim();
-                        fromAddress = project.resendFromEmail && project.resendFromEmail.trim() 
-                            ? project.resendFromEmail.trim() 
+                        fromAddress = project.resendFromEmail && project.resendFromEmail.trim()
+                            ? project.resendFromEmail.trim()
                             : "onboarding@resend.dev";
                     }
                 }
@@ -65,18 +63,15 @@ const initPublicEmailWorker = () => {
         const maskedTo = toList.map(redact).join(', ');
 
         console.log(`[Queue] Processing public email to: ${maskedTo}`);
-        
+
         const { data, error } = await resend.emails.send(finalPayload);
-        
+
         if (error) {
             console.error(`[Queue] Failed to send public email to ${maskedTo}:`, error);
             throw new Error(error.message || "Failed to send email");
         }
-        
+
         return { data };
-        } catch (err) {
-            throw err;
-        }
     }, {
         connection,
         limiter: {
@@ -94,8 +89,7 @@ const initPublicEmailWorker = () => {
         if (job && job.data && job.data.consumedQuotaKey) {
             const maxAttempts = job.opts?.attempts || 1;
             if (job.attemptsMade >= maxAttempts) {
-                const luaScript = DECR_IF_EXISTS_SCRIPT;
-                await connection.eval(luaScript, 1, job.data.consumedQuotaKey).catch(() => {});
+                await connection.eval(DECR_IF_EXISTS_SCRIPT, 1, job.data.consumedQuotaKey).catch(() => {});
             }
         }
     });
