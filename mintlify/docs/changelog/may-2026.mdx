@@ -1,0 +1,38 @@
+---
+title: Changelog (May 2026)
+description: What's new in urBackend — new features, improvements, and fixes for May.
+---
+
+<Update label="2026-05-12" description="Week of April 28 – May 12" tags={["Feature", "Improvement", "Fix"]}>
+## New features
+
+**Metrics Stack & Telemetry** — Added a comprehensive analytics and telemetry stack. The admin dashboard now includes a full activation funnel (signup through first API success), interactive D1/D7/D30 retention cohorts, and churn signals. A new "My Performance" widget is available for developers to track their 30-day API and Mail usage.
+
+**Proactive Reliability Alerts** — A new background worker continuously monitors API error rates across all projects. If a project experiences a >5% error rate within a 15-minute window, a `reliability_spike` event is flagged automatically in the admin dashboard.
+
+**Mail API migrated to BullMQ** — The `/api/mail/send` endpoint has been fully decoupled from the synchronous request path. All outgoing emails now route through a high-performance Redis-backed BullMQ queue, eliminating 429 rate-limiting timeouts, handling automatic retries, and ensuring safe quota refunds on permanent failures.
+
+**Interactive User Onboarding** — The dashboard now features a premium, full-page guided onboarding flow with glassmorphism UI. This replaces the old checklist and walks new developers through project creation, API key generation, and their first API calls.
+
+**Schema Default Values** — You can now define optional default values for fields within your collection schemas. These defaults are strictly enforced at runtime, passing through Zod validation and injecting cleanly into MongoDB during insertions.
+
+**API Performance Analytics** — The public API now tracks detailed latency and error-rate metrics. Developers can view their average response times and error percentages directly in the dashboard, filterable via a new time-range selector.
+
+## Improvements
+
+**Cursor Pagination** — Added proper cursor-based pagination support to the database API. This eliminates off-by-one errors and includes automatic tie-breaker sorting to preserve query determinism on large collections. The default limit has been aligned to 100 records.
+
+**Dashboard UI Redesign** — The analytics pages and dashboard headers have been redesigned with a squared, premium dark-mode aesthetic. Dynamic API request usage is now displayed directly in the header stats.
+
+**Password Reset OTP Cooldown** — Hardened the password reset flow with an atomic Redis-based OTP cooldown. This prevents account enumeration attacks by returning standardized success responses regardless of whether the email exists.
+
+## Bug fixes
+
+- Patched a severe polynomial regular expression denial-of-service (ReDoS) vulnerability in the release link extraction logic.
+- Resolved high-severity dependency vulnerabilities and updated the dashboard build configuration for Vite 6 compatibility.
+- Fixed a bug causing the login lockout to persist after a successful password reset.
+- Fixed duplicate key handling and negative limit clamping in bulk insert APIs.
+- Masked PII (personally identifiable information) from server logs and implemented robust email redaction.
+- Resolved a 'ns does not exist' error that occasionally triggered during a project's first collection creation.
+- Replaced `Math.random()` with cryptographically secure `crypto.randomInt()` for all OTP generation.
+</Update>
