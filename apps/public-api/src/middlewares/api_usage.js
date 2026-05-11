@@ -63,7 +63,7 @@ const logger = (req, res, next) => {
                     try {
                         await ApiAnalytics.create({
                             projectId: req.project._id,
-                            endpoint: req.originalUrl,
+                            endpoint: req.originalUrl.split('?')[0],
                             method: req.method,
                             statusCode: res.statusCode,
                             responseTimeMs: parseFloat(responseTimeMs),
