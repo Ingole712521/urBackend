@@ -29,10 +29,10 @@ description: What's new in urBackend — new features, improvements, and fixes f
 ## Bug fixes
 
 - You are now protected against a severe polynomial regular expression denial-of-service (ReDoS) vulnerability in the release link extraction logic.
-- We resolved high-severity dependency vulnerabilities. We also updated the dashboard build configuration for Vite 6 compatibility.
-- We fixed a bug that caused the login lockout to persist after a successful password reset.
-- We fixed duplicate key handling and negative limit clamping in bulk insert APIs.
-- We now mask PII (personally identifiable information) from server logs. We also implemented robust email redaction.
-- We resolved a 'ns does not exist' error that occasionally triggered during your project's first collection creation.
-- We replaced `Math.random()` with cryptographically secure `crypto.randomInt()` for all OTP generation.
+- You no longer need to worry about high-severity dependency vulnerabilities; the dashboard build configuration has also been updated for Vite 6 compatibility.
+- You no longer experience login lockout persistence after a successful password reset.
+- You no longer encounter duplicate key handling issues or negative limit clamping in bulk insert APIs.
+- Your PII (personally identifiable information) is now masked from server logs, and emails are redacted.
+- You should no longer see the 'ns does not exist' error during your project's first collection creation.
+- You now benefit from cryptographically secure `crypto.randomInt()` in place of `Math.random()` for all OTP generation.
 </Update>
