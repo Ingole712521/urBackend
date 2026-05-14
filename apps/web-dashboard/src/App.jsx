@@ -26,6 +26,7 @@ import ForgotPassword from './pages/ForgotPassword';
 import Settings from './pages/Settings';
 import ProjectSettings from './pages/ProjectSettings';
 import Webhooks from './pages/Webhooks';
+import MailPlatform from './pages/MailPlatform';
 import RequestPro from './pages/RequestPro';
 import AdminProRequests from './pages/AdminProRequests';
 import Onboarding from './pages/Onboarding';
@@ -116,6 +117,8 @@ function AppContent() {
         } />
 
         <Route path="/project/:projectId/auth" element={<ProtectedRoute><MainLayout><Auth /></MainLayout></ProtectedRoute>} />
+
+        <Route path="/project/:projectId/mail" element={<ProtectedRoute><MainLayout><MailPlatform /></MainLayout></ProtectedRoute>} />
 
         <Route path="/project/:projectId/webhooks" element={<ProtectedRoute><MainLayout><Webhooks /></MainLayout></ProtectedRoute>} />
 

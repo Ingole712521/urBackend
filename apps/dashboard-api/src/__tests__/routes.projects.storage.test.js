@@ -66,6 +66,13 @@ jest.mock('../controllers/project.controller', () => {
     deleteMailTemplate: jest.fn(ok),
     requestUpload: jest.fn(ok),
     confirmUpload: jest.fn(ok),
+    getMailLogs: jest.fn(ok),
+    getResendLiveStatus: jest.fn(ok),
+    manageAudiences: jest.fn(ok),
+    deleteAudience: jest.fn(ok),
+    manageContacts: jest.fn(ok),
+    deleteContact: jest.fn(ok),
+    sendMarketingBroadcast: jest.fn(ok),
   };
 });
 

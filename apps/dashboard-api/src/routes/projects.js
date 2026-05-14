@@ -37,8 +37,15 @@ const {
     updateMailTemplate,
     deleteMailTemplate,
     requestUpload,
-    confirmUpload
-} = require("../controllers/project.controller")
+    confirmUpload,
+    getMailLogs,
+    getResendLiveStatus,
+    manageAudiences,
+    deleteAudience,
+    manageContacts,
+    deleteContact,
+    sendMarketingBroadcast
+} = require("../controllers/project.controller");
 
 const { createAdminUser, resetPassword, getUserDetails, updateAdminUser, listUserSessions, revokeUserSession } = require('../controllers/userAuth.controller');
 
@@ -87,6 +94,17 @@ router.get('/:projectId/mail/templates/:templateId', authMiddleware, getMailTemp
 router.post('/:projectId/mail/templates', authMiddleware, verifyEmail, planEnforcement.attachDeveloper, planEnforcement.checkMailTemplatesGate, createMailTemplate);
 router.patch('/:projectId/mail/templates/:templateId', authMiddleware, verifyEmail, planEnforcement.attachDeveloper, planEnforcement.checkMailTemplatesGate, updateMailTemplate);
 router.delete('/:projectId/mail/templates/:templateId', authMiddleware, verifyEmail, deleteMailTemplate);
+
+// EXPANDED MAIL API PLATFORM PROXIES
+router.get('/:projectId/mail/logs', authMiddleware, getMailLogs);
+router.get('/:projectId/mail/logs/:resendId/live', authMiddleware, getResendLiveStatus);
+router.get('/:projectId/mail/audiences', authMiddleware, manageAudiences);
+router.post('/:projectId/mail/audiences', authMiddleware, verifyEmail, manageAudiences);
+router.delete('/:projectId/mail/audiences/:audienceId', authMiddleware, verifyEmail, deleteAudience);
+router.get('/:projectId/mail/audiences/:audienceId/contacts', authMiddleware, manageContacts);
+router.post('/:projectId/mail/audiences/:audienceId/contacts', authMiddleware, verifyEmail, manageContacts);
+router.delete('/:projectId/mail/audiences/:audienceId/contacts/:contactId', authMiddleware, verifyEmail, deleteContact);
+router.post('/:projectId/mail/broadcasts', authMiddleware, verifyEmail, sendMarketingBroadcast);
 
 // PATCH REQ FOR ALLOWED DOMAINS
 router.patch('/:projectId/allowed-domains', authMiddleware, verifyEmail, updateAllowedDomains);

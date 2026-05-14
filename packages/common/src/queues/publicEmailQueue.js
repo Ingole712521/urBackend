@@ -3,6 +3,7 @@ const connection = require('../config/redis');
 const Project = require('../models/Project');
 const { decrypt } = require('../utils/encryption');
 const { Resend } = require('resend');
+const MailLog = require('../models/MailLog');
 
 // Lua script: only decrement quota key if it exists (prevents phantom negative keys with no TTL)
 const DECR_IF_EXISTS_SCRIPT = `if redis.call('EXISTS', KEYS[1]) == 1 then return redis.call('DECR', KEYS[1]) else return 0 end`;
@@ -17,7 +18,7 @@ const initPublicEmailWorker = () => {
 
     // Initialize Worker with Rate Limiting (10 per second to respect Resend limits)
     worker = new Worker('public-email-queue', async (job) => {
-        const { projectId, payload, usingByok, consumedQuotaKey } = job.data;
+        const { projectId, payload, usingByok, consumedQuotaKey, templateUsed } = job.data;
 
         let clientKey = process.env.RESEND_API_KEY_2 || process.env.RESEND_API_KEY;
         let fromAddress = process.env.EMAIL_FROM || "urBackend <urbackend@apps.bitbros.in>";
@@ -69,6 +70,23 @@ const initPublicEmailWorker = () => {
         if (error) {
             console.error(`[Queue] Failed to send public email to ${maskedTo}:`, error);
             throw new Error(error.message || "Failed to send email");
+        }
+
+        if (data && data.id && projectId) {
+            try {
+                await MailLog.create({
+                    projectId,
+                    resendEmailId: data.id,
+                    to: toList,
+                    subject: finalPayload.subject || '',
+                    status: 'sent',
+                    usingByok: !!usingByok,
+                    templateUsed: templateUsed || null,
+                    sentAt: new Date()
+                });
+            } catch (logErr) {
+                console.error(`[Queue] Failed to create MailLog for emailId ${data.id}:`, logErr);
+            }
         }
 
         return { data };

@@ -25,7 +25,7 @@ function OtpVerification() {
                 setCountdown((prev) => prev - 1);
             }, 1000);
         } else if (countdown === 0) {
-            setCanResend(true);
+            queueMicrotask(() => setCanResend(true));
         }
         return () => clearInterval(timer);
     }, [countdown, canResend]);

@@ -26,6 +26,7 @@ const {initAuthEmailWorker, initPublicEmailWorker} = require('@urbackend/common'
 const {initActivityRollupWorker, scheduleActivityRollup} = require('@urbackend/common');
 const {initReliabilityAlertWorker, scheduleReliabilityAlert} = require('@urbackend/common');
 
+app.use('/api/mail/webhook', express.raw({ type: 'application/json' }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(standardizeApiResponse);

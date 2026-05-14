@@ -26,6 +26,7 @@ const ProRequest = require("./models/ProRequest");
 const ApiAnalytics = require("./models/ApiAnalytics");
 const PlatformEvent = require("./models/PlatformEvent");
 const DeveloperActivity = require("./models/DeveloperActivity");
+const MailLog = require("./models/MailLog");
 
 // Queues
 const { authEmailQueue, initAuthEmailWorker } = require("./queues/authEmailQueue");
@@ -193,6 +194,7 @@ module.exports = {
   ApiAnalytics,
   PlatformEvent,
   DeveloperActivity,
+  MailLog,
   activityRollupQueue,
   scheduleActivityRollup,
   initActivityRollupWorker,
