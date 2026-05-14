@@ -72,6 +72,7 @@ jest.mock('@urbackend/common', () => {
 
 const { Project, decrypt, redis, publicEmailQueue, MailLog } = require('@urbackend/common');
 const mailController = require('../controllers/mail.controller');
+const originalResendApiKey2 = process.env.RESEND_API_KEY_2;
 
 const makeReq = () => ({
     keyRole: 'secret',
@@ -102,6 +103,14 @@ describe('mail.controller', () => {
         delete process.env.RESEND_API_KEY_2;
         process.env.EMAIL_FROM = 'mail@urbackend.app';
         process.env.RESEND_WEBHOOK_SECRET = 'whsec_test';
+    });
+
+    afterEach(() => {
+        if (typeof originalResendApiKey2 === 'undefined') {
+            delete process.env.RESEND_API_KEY_2;
+        } else {
+            process.env.RESEND_API_KEY_2 = originalResendApiKey2;
+        }
     });
 
     test('sends mail using BYOK key when configured', async () => {
