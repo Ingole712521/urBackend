@@ -730,13 +730,14 @@ const requireBroadcastGate = async (req) => {
 module.exports.createBroadcast = async (req, res) => {
   try {
     const resend = await requireBroadcastGate(req);
-    const { segmentId, from, subject, html, scheduledAt } = req.body;
-    if (!segmentId || !subject || !html) {
-      return res.status(400).json({ success: false, data: {}, message: "segmentId, subject, and html are required." });
+    const { audienceId, segmentId, from, subject, html, scheduledAt } = req.body;
+    const resolvedAudienceId = audienceId || segmentId;
+    if (!resolvedAudienceId || !subject || !html) {
+      return res.status(400).json({ success: false, data: {}, message: "audienceId, subject, and html are required." });
     }
 
     const payload = {
-      audienceId: segmentId,
+      audienceId: resolvedAudienceId,
       from: from || process.env.EMAIL_FROM || "urBackend <urbackend@apps.bitbros.in>",
       subject,
       html

@@ -3,7 +3,41 @@
 process.env.REDIS_URL = process.env.REDIS_URL || "redis://localhost:6379/0";
 process.env.ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || "0123456789012345678901234567890a";
 
-// Removed resend mock because mail.controller no longer imports it
+const mockResendClient = {
+    batch: { send: jest.fn() },
+    audiences: {
+        create: jest.fn(),
+        list: jest.fn(),
+        get: jest.fn(),
+        remove: jest.fn(),
+    },
+    contacts: {
+        create: jest.fn(),
+        list: jest.fn(),
+        get: jest.fn(),
+        update: jest.fn(),
+        remove: jest.fn(),
+    },
+    broadcasts: {
+        create: jest.fn(),
+        send: jest.fn(),
+        list: jest.fn(),
+        get: jest.fn(),
+        remove: jest.fn(),
+    },
+    emails: { get: jest.fn() },
+};
+const mockWebhookVerify = jest.fn();
+
+jest.mock('resend', () => ({
+    Resend: jest.fn(() => mockResendClient),
+}));
+
+jest.mock('svix', () => ({
+    Webhook: jest.fn(() => ({
+        verify: mockWebhookVerify,
+    })),
+}));
 
 jest.mock('@urbackend/common', () => {
     const { sendMailSchema } = require('../../../../packages/common/src/utils/input.validation');
@@ -28,11 +62,15 @@ jest.mock('@urbackend/common', () => {
         getPlanLimits: jest.fn(() => ({ mailPerMonth: 100 })),
         publicEmailQueue: {
             add: jest.fn(() => Promise.resolve({ id: 'job-123' }))
-        }
+        },
+        MailLog: {
+            updateOne: jest.fn(),
+            insertMany: jest.fn(),
+        },
     };
 });
 
-const { Project, decrypt, redis, publicEmailQueue } = require('@urbackend/common');
+const { Project, decrypt, redis, publicEmailQueue, MailLog } = require('@urbackend/common');
 const mailController = require('../controllers/mail.controller');
 
 const makeReq = () => ({
@@ -61,7 +99,10 @@ describe('mail.controller', () => {
     beforeEach(() => {
         jest.clearAllMocks();
         process.env.RESEND_API_KEY = 'default-key';
+        process.env.RESEND_API_KEY_2 = '';
         process.env.EMAIL_FROM = 'mail@urbackend.app';
+        process.env.RESEND_WEBHOOK_SECRET = 'whsec_test';
+        redis.decr.mockResolvedValue(0);
     });
 
     test('sends mail using BYOK key when configured', async () => {
@@ -225,5 +266,102 @@ describe('mail.controller', () => {
         await failedHandler(mockJob, new Error("Temporary failure"));
 
         expect(mockRedis.eval).not.toHaveBeenCalled();
+    });
+
+    test('returns 400 when webhook signature verification fails', async () => {
+        const req = { body: Buffer.from('{}'), headers: {} };
+        const res = makeRes();
+        mockWebhookVerify.mockImplementation(() => {
+            throw new Error('invalid signature');
+        });
+
+        await mailController.handleResendWebhook(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(MailLog.updateOne).not.toHaveBeenCalled();
+    });
+
+    test('updates MailLog status when webhook verification succeeds', async () => {
+        const req = {
+            body: Buffer.from(JSON.stringify({ test: true })),
+            headers: { 'svix-id': '1', 'svix-timestamp': '2', 'svix-signature': '3' }
+        };
+        const res = makeRes();
+        mockWebhookVerify.mockReturnValue({
+            type: 'email.delivered',
+            data: { email_id: 're_123' }
+        });
+
+        await mailController.handleResendWebhook(req, res);
+
+        expect(MailLog.updateOne).toHaveBeenCalledWith(
+            { resendEmailId: 're_123' },
+            expect.objectContaining({ $set: expect.objectContaining({ status: 'delivered' }) })
+        );
+        expect(res.status).toHaveBeenCalledWith(200);
+    });
+
+    test('refunds reserved quota when batch provider call fails', async () => {
+        const req = makeReq();
+        req.body = [{ to: 'u@example.com', subject: 'Batch', text: 'Hello' }];
+        const res = makeRes();
+
+        mockProjectConfig({ _id: 'proj_1', resendApiKey: null });
+        decrypt.mockReturnValue(null);
+        redis.eval.mockResolvedValue(1);
+        mockResendClient.batch.send.mockResolvedValue({
+            data: null,
+            error: { statusCode: 503, message: 'Provider unavailable' }
+        });
+
+        await mailController.sendBatchMail(req, res);
+
+        expect(redis.decr).toHaveBeenCalledWith(expect.stringContaining('project:mail:count:proj_1:'));
+        expect(res.status).toHaveBeenCalledWith(503);
+    });
+
+    test('enforces BYOK gate for audience creation', async () => {
+        const req = makeReq();
+        req.body = { name: 'Audience A' };
+        const res = makeRes();
+
+        mockProjectConfig({ _id: 'proj_1', resendApiKey: null });
+        decrypt.mockReturnValue(null);
+
+        await mailController.createAudience(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(403);
+        expect(mockResendClient.audiences.create).not.toHaveBeenCalled();
+    });
+
+    test('enforces Pro plan gate for broadcast creation', async () => {
+        const req = makeReq();
+        req.planLimits = { byokEnabled: false };
+        req.body = { audienceId: 'aud_1', subject: 'Hello', html: '<p>Hi</p>' };
+        const res = makeRes();
+
+        mockProjectConfig({ _id: 'proj_1', resendApiKey: { encrypted: 'x', iv: 'y', tag: 'z' } });
+        decrypt.mockReturnValue('byok-key');
+
+        await mailController.createBroadcast(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(403);
+        expect(mockResendClient.broadcasts.create).not.toHaveBeenCalled();
+    });
+
+    test('accepts audienceId field when creating broadcast', async () => {
+        const req = makeReq();
+        req.planLimits = { byokEnabled: true };
+        req.body = { audienceId: 'aud_123', subject: 'Promo', html: '<p>Deal</p>' };
+        const res = makeRes();
+
+        mockProjectConfig({ _id: 'proj_1', resendApiKey: { encrypted: 'x', iv: 'y', tag: 'z' } });
+        decrypt.mockReturnValue('byok-key');
+        mockResendClient.broadcasts.create.mockResolvedValue({ data: { id: 'b_1' }, error: null });
+
+        await mailController.createBroadcast(req, res);
+
+        expect(mockResendClient.broadcasts.create).toHaveBeenCalledWith(expect.objectContaining({ audienceId: 'aud_123' }));
+        expect(res.status).toHaveBeenCalledWith(200);
     });
 });

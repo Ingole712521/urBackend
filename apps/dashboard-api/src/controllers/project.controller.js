@@ -2387,7 +2387,7 @@ const getResolvedResendKey = (project) => {
             console.error("Failed to decrypt project resend key", e);
         }
     }
-    return { key: process.env.RESEND_API_KEY, isByok: false };
+    return { key: process.env.RESEND_API_KEY_2 || process.env.RESEND_API_KEY, isByok: false };
 };
 
 module.exports.getMailLogs = async (req, res) => {
@@ -2434,15 +2434,14 @@ module.exports.getResendLiveStatus = async (req, res) => {
     } catch (err) {
         const { resendId } = req.params;
         if (err.response?.status === 404) {
-            return res.json({
-                success: true,
+            return res.status(404).json({
+                success: false,
                 data: {
                     id: resendId,
-                    last_event: "delivered (simulated / test pool)",
-                    to: ["Queried successfully from local MailLog edge"],
-                    created_at: new Date().toISOString(),
-                    note: "Resend API Edge returned 404 Not Found. Since this dispatch used a shared sandbox or test pool token, real-time edge tracing logs are ephemeral and not persisted on external Resend matrix servers."
-                }
+                    last_event: "unknown",
+                    providerStatus: "not_found",
+                },
+                message: "Email status not found on Resend for this id."
             });
         }
         const errorMsg = err.response?.data?.message || err.message;
