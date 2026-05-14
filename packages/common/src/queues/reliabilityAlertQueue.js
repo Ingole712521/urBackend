@@ -32,7 +32,7 @@ async function scheduleReliabilityAlert() {
 /**
  * Run the reliability check.
  * Looks at the last 15 minutes of ApiAnalytics.
- * If a project has >=20 total requests and >5% error rate (using >= 500 for true platform errors),
+ * If a project has >=20 total requests and >=5% error rate (using >= 500 for true platform errors),
  * it writes a PlatformEvent 'reliability_spike'.
  */
 async function runReliabilityCheck() {
