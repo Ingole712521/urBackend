@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const authMiddleware = require('../middlewares/authMiddleware');
 const {
+  requireAdmin,
   getOverview,
   getActivationFunnel,
   getCohorts,
@@ -11,14 +12,16 @@ const {
   getChurnSignals,
 } = require('../controllers/admin.metrics.controller');
 
-// All admin routes require a valid dashboard session.
-// The controller's requireAdmin() guard enforces isAdmin=true.
-router.get('/overview', authMiddleware, getOverview);
-router.get('/activation-funnel', authMiddleware, getActivationFunnel);
-router.get('/cohorts', authMiddleware, getCohorts);
-router.get('/feature-usage', authMiddleware, getFeatureUsage);
-router.get('/reliability', authMiddleware, getReliability);
-router.get('/top-projects', authMiddleware, getTopProjects);
-router.get('/churn-signals', authMiddleware, getChurnSignals);
+// All admin routes require a valid dashboard session and isAdmin=true.
+router.use(authMiddleware);
+router.use(requireAdmin);
+
+router.get('/overview', getOverview);
+router.get('/activation-funnel', getActivationFunnel);
+router.get('/cohorts', getCohorts);
+router.get('/feature-usage', getFeatureUsage);
+router.get('/reliability', getReliability);
+router.get('/top-projects', getTopProjects);
+router.get('/churn-signals', getChurnSignals);
 
 module.exports = router;

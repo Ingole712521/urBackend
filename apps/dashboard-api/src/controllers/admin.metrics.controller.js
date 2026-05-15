@@ -5,20 +5,20 @@ const { Developer, Project, Log, ApiAnalytics, PlatformEvent, DeveloperActivity 
  * Checked upstream via the isAdmin flag on the JWT payload,
  * but we double-check here for defence in depth.
  */
-function requireAdmin(req, res) {
+function requireAdmin(req, res, next) {
   if (!req.user?.isAdmin) {
-    res.status(403).json({ success: false, data: {}, message: 'Admin access required.' });
-    return false;
+    return res.status(403).json({ success: false, data: {}, message: 'Admin access required.' });
   }
-  return true;
+  return next();
 }
+
+module.exports.requireAdmin = requireAdmin;
 
 // ---------------------------------------------------------------------------
 // GET /api/admin/metrics/overview
 // Platform-wide snapshot: signups, verified devs, active projects, total calls.
 // ---------------------------------------------------------------------------
 module.exports.getOverview = async (req, res) => {
-  if (!requireAdmin(req, res)) return;
   try {
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setUTCDate(sevenDaysAgo.getUTCDate() - 7);
@@ -62,7 +62,6 @@ module.exports.getOverview = async (req, res) => {
 // Platform-wide funnel: count of devs who completed each activation step.
 // ---------------------------------------------------------------------------
 module.exports.getActivationFunnel = async (req, res) => {
-  if (!requireAdmin(req, res)) return;
   try {
     const FUNNEL_STEPS = [
       'signup_completed',
@@ -117,7 +116,6 @@ module.exports.getActivationFunnel = async (req, res) => {
 // D1/D7/D30 retention for developers who signed up in a given month.
 // ---------------------------------------------------------------------------
 module.exports.getCohorts = async (req, res) => {
-  if (!requireAdmin(req, res)) return;
   try {
     const { month } = req.query; // e.g. "2026-05"
     if (!month || !/^\d{4}-\d{2}$/.test(month)) {
@@ -237,7 +235,6 @@ module.exports.getCohorts = async (req, res) => {
 // Platform-wide feature breakdown from DeveloperActivity (last 30 days).
 // ---------------------------------------------------------------------------
 module.exports.getFeatureUsage = async (req, res) => {
-  if (!requireAdmin(req, res)) return;
   try {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setUTCDate(thirtyDaysAgo.getUTCDate() - 30);
@@ -245,24 +242,33 @@ module.exports.getFeatureUsage = async (req, res) => {
     const agg = await DeveloperActivity.aggregate([
       { $match: { date: { $gte: thirtyDaysAgo } } },
       {
-        $group: {
-          _id: null,
-          totalApiCalls: { $sum: '$apiCallCount' },
-          totalMailSent: { $sum: '$mailSentCount' },
-          totalStorageUploads: { $sum: '$storageUploadsCount' },
-          totalWebhooksFired: { $sum: '$webhookTriggeredCount' },
-          activeDevelopers: { $addToSet: '$developerId' },
+        $facet: {
+          totals: [
+            {
+              $group: {
+                _id: null,
+                totalApiCalls: { $sum: '$apiCallCount' },
+                totalMailSent: { $sum: '$mailSentCount' },
+                totalStorageUploads: { $sum: '$storageUploadsCount' },
+                totalWebhooksFired: { $sum: '$webhookTriggeredCount' },
+              },
+            },
+          ],
+          activeDevelopers: [
+            { $group: { _id: '$developerId' } },
+            { $count: 'count' },
+          ],
         },
       },
     ]);
 
-    const result = agg[0] || {
+    const result = agg[0]?.totals?.[0] || {
       totalApiCalls: 0,
       totalMailSent: 0,
       totalStorageUploads: 0,
       totalWebhooksFired: 0,
-      activeDevelopers: [],
     };
+    const activeDeveloperCount = agg[0]?.activeDevelopers?.[0]?.count || 0;
 
     return res.json({
       success: true,
@@ -272,7 +278,7 @@ module.exports.getFeatureUsage = async (req, res) => {
         totalMailSent: result.totalMailSent,
         totalStorageUploads: result.totalStorageUploads,
         totalWebhooksFired: result.totalWebhooksFired,
-        activeDevelopers: result.activeDevelopers.length,
+        activeDevelopers: activeDeveloperCount,
       },
       message: '',
     });
@@ -287,7 +293,6 @@ module.exports.getFeatureUsage = async (req, res) => {
 // Global error rate and latency across all projects (last 24h from ApiAnalytics).
 // ---------------------------------------------------------------------------
 module.exports.getReliability = async (req, res) => {
-  if (!requireAdmin(req, res)) return;
   try {
     const { ApiAnalytics } = require('@urbackend/common');
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
@@ -332,7 +337,6 @@ module.exports.getReliability = async (req, res) => {
 // Most active projects by API calls in the last 7 days.
 // ---------------------------------------------------------------------------
 module.exports.getTopProjects = async (req, res) => {
-  if (!requireAdmin(req, res)) return;
   try {
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setUTCDate(sevenDaysAgo.getUTCDate() - 7);
@@ -372,7 +376,6 @@ module.exports.getTopProjects = async (req, res) => {
 // Projects with zero API calls in the last 14 days that had prior activity.
 // ---------------------------------------------------------------------------
 module.exports.getChurnSignals = async (req, res) => {
-  if (!requireAdmin(req, res)) return;
   try {
     const fourteenDaysAgo = new Date();
     fourteenDaysAgo.setUTCDate(fourteenDaysAgo.getUTCDate() - 14);
