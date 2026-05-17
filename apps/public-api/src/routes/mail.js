@@ -50,9 +50,9 @@ router.delete("/audiences/:id/contacts/:contactId", verifyApiKey, requireSecretK
 
 // Broadcasts (BYOK + Pro Gate enforced inside controller)
 router.post("/broadcasts", verifyApiKey, requireSecretKey, checkUsageLimits, createBroadcast);
-router.post("/broadcasts/:id/send", verifyApiKey, requireSecretKey, sendBroadcast);
-router.get("/broadcasts", verifyApiKey, requireSecretKey, getBroadcasts);
-router.get("/broadcasts/:id", verifyApiKey, requireSecretKey, getBroadcastById);
-router.delete("/broadcasts/:id", verifyApiKey, requireSecretKey, deleteBroadcast);
+router.post("/broadcasts/:id/send", verifyApiKey, requireSecretKey, checkUsageLimits, sendBroadcast);
+router.get("/broadcasts", verifyApiKey, requireSecretKey, checkUsageLimits, getBroadcasts);
+router.get("/broadcasts/:id", verifyApiKey, requireSecretKey, checkUsageLimits, getBroadcastById);
+router.delete("/broadcasts/:id", verifyApiKey, requireSecretKey, checkUsageLimits, deleteBroadcast);
 
 module.exports = router;

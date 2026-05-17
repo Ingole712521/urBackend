@@ -23,6 +23,7 @@ const { getCompiledModel } = require("@urbackend/common");
 const { QueryEngine } = require("@urbackend/common");
 const { storageRegistry } = require("@urbackend/common");
 const { AppError } = require("@urbackend/common");
+const { resolveEffectivePlan } = require("@urbackend/common");
 const {
   deleteProjectByApiKeyCache,
   setProjectById,
@@ -2595,7 +2596,8 @@ module.exports.sendMarketingBroadcast = async (req, res) => {
         }
 
         const dev = await Developer.findById(req.user._id);
-        if (dev?.plan?.toLowerCase() !== "pro") {
+        const effectivePlan = resolveEffectivePlan(dev);
+        if (effectivePlan !== "pro") {
             return res.status(403).json({ success: false, message: "Marketing Broadcasts are a premium feature requiring the Pro tier." });
         }
 
