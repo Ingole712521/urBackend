@@ -35,7 +35,7 @@ flowchart LR
   B --> C[Quota reservation + BYOK/default provider resolve]
   C --> D[BullMQ mail queue (single-send path)]
   D --> E[Resend API]
-  C --> E
+  C --> E[Resend API (batch-send direct path)]
   E --> F[Delivery events webhook]
   F --> G[POST /api/mail/webhook\nSvix verify]
   G --> H[(MailLog)]
@@ -494,6 +494,8 @@ Set `RESEND_WEBHOOK_SECRET` in server env. Webhook signature verification and ev
 | `email.bounced` | `bounced` |
 | `email.complained` | `complained` |
 | `email.delivery_delayed` | `queued` |
+
+`email.sent` represents provider acceptance (intermediate state), not final inbox delivery.
 
 ### Retry behavior
 
