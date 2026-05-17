@@ -84,7 +84,9 @@ module.exports.insertData = async (req, res) => {
     if (isDebug) console.log(`[DEBUG] insert data took ${(performance.now() - start).toFixed(2)}ms`);
     res.status(201).json(result);
   } catch (err) {
-    console.error(err);
+    if (process.env.NODE_ENV !== 'test') {
+      console.error(err);
+    }
 
     if (isDuplicateKeyError(err)) {
       return res.status(409).json({
@@ -173,7 +175,9 @@ module.exports.insertData = async (req, res) => {
       message: "Bulk insert successful",
     });
   } catch (err) {
-  console.error(err);
+    if (process.env.NODE_ENV !== 'test') {
+      console.error(err);
+    }
 
   if (isDuplicateKeyError(err)) {
     return next(
@@ -285,7 +289,9 @@ module.exports.getAllData = async (req, res) => {
       message: "Data fetched successfully",
     });
   } catch (err) {
-    console.error(err);
+    if (process.env.NODE_ENV !== 'test') {
+      console.error(err);
+    }
 
     if (err && (err.statusCode === 400 || err.name === 'QueryFilterError')) {
       return res.status(400).json({
@@ -358,7 +364,9 @@ module.exports.getSingleDoc = async (req, res) => {
 
     res.json(doc);
   } catch (err) {
-    console.error(err);
+    if (process.env.NODE_ENV !== 'test') {
+      console.error(err);
+    }
     res.status(500).json({ error: err.message });
   }
 };
@@ -418,7 +426,9 @@ module.exports.aggregateData = async (req, res) => {
       message: "Aggregation executed successfully.",
     });
   } catch (err) {
-    console.error(err);
+    if (process.env.NODE_ENV !== 'test') {
+      console.error(err);
+    }
 
     if (err instanceof z.ZodError) {
       return res.status(400).json({
@@ -489,7 +499,9 @@ module.exports.updateSingleData = async (req, res) => {
 
     res.json({ message: "Updated", data: result });
   } catch (err) {
-    console.error(err);
+    if (process.env.NODE_ENV !== 'test') {
+      console.error(err);
+    }
 
     if (isDuplicateKeyError(err)) {
       return res.status(409).json({
@@ -557,7 +569,9 @@ module.exports.deleteSingleDoc = async (req, res) => {
 
     res.json({ message: "Document deleted", id });
   } catch (err) {
-    console.error(err);
+    if (process.env.NODE_ENV !== 'test') {
+      console.error(err);
+    }
     res.status(500).json({ error: err.message });
   }
 };

@@ -103,7 +103,9 @@ const initPublicEmailWorker = () => {
     });
 
     worker.on('failed', async (job, err) => {
-        console.error(`[Queue] Job ${job?.id} (public email) failed:`, err);
+        if (process.env.NODE_ENV !== 'test') {
+            console.error(`[Queue] Job ${job?.id} (public email) failed:`, err);
+        }
         if (job && job.data && job.data.consumedQuotaKey) {
             const maxAttempts = job.opts?.attempts || 1;
             if (job.attemptsMade >= maxAttempts) {

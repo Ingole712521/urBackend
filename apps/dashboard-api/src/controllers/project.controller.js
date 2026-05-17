@@ -1604,7 +1604,10 @@ module.exports.listMailTemplates = async (req, res) => {
       message: "Mail templates fetched.",
     });
   } catch (err) {
-    return res.status(500).json({ success: false, data: {}, message: "Failed to fetch mail templates." });
+    return res.status(500).json({
+      error: "Internal server error",
+      details: process.env.NODE_ENV === "development" ? err.message : undefined,
+    });
   }
 };
 
@@ -1639,7 +1642,10 @@ module.exports.listGlobalMailTemplates = async (req, res) => {
       message: "Global mail templates fetched.",
     });
   } catch (err) {
-    return res.status(500).json({ success: false, data: {}, message: err.message });
+    return res.status(500).json({
+      error: "Internal server error",
+      details: process.env.NODE_ENV === "development" ? err.message : undefined,
+    });
   }
 };
 
@@ -1702,7 +1708,10 @@ module.exports.getMailTemplate = async (req, res) => {
       message: "Mail template fetched.",
     });
   } catch (err) {
-    return res.status(500).json({ success: false, data: {}, message: "Failed to fetch template." });
+    return res.status(500).json({
+      error: "Internal server error",
+      details: process.env.NODE_ENV === "development" ? err.message : undefined,
+    });
   }
 };
 
@@ -1767,7 +1776,10 @@ module.exports.createMailTemplate = async (req, res) => {
       return res.status(409).json({ success: false, data: {}, message: "Template name/key already exists." });
     }
 
-    return res.status(500).json({ success: false, data: {}, message: "Failed to create template." });
+    return res.status(500).json({
+      error: "Internal server error",
+      details: process.env.NODE_ENV === "development" ? err.message : undefined,
+    });
   }
 };
 
@@ -1853,7 +1865,10 @@ module.exports.updateMailTemplate = async (req, res) => {
       return res.status(409).json({ success: false, data: {}, message: "Template name/key already exists." });
     }
 
-    return res.status(500).json({ success: false, data: {}, message: "Failed to update template." });
+    return res.status(500).json({
+      error: "Internal server error",
+      details: process.env.NODE_ENV === "development" ? err.message : undefined,
+    });
   }
 };
 
@@ -1880,7 +1895,10 @@ module.exports.deleteMailTemplate = async (req, res) => {
 
     return res.json({ success: true, data: {}, message: "Mail template deleted." });
   } catch (err) {
-    return res.status(500).json({ success: false, data: {}, message: "Failed to delete template." });
+    return res.status(500).json({
+      error: "Internal server error",
+      details: process.env.NODE_ENV === "development" ? err.message : undefined,
+    });
   }
 };
 

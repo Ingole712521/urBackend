@@ -70,7 +70,7 @@ jest.mock('@urbackend/common', () => {
     };
 });
 
-const { Project, decrypt, redis, publicEmailQueue, MailLog } = require('@urbackend/common');
+const { Project, decrypt, redis, publicEmailQueue, MailTemplate, MailLog } = require('@urbackend/common');
 const mailController = require('../controllers/mail.controller');
 const originalResendApiKey2 = process.env.RESEND_API_KEY_2;
 
@@ -206,6 +206,91 @@ describe('mail.controller', () => {
                 html: '<p>Welcome, Yash!</p>',
             })
         }), expect.objectContaining({ attempts: expect.any(Number) }));
+    });
+
+    test('renders and sends a project-scoped mail template from DB', async () => {
+        const req = makeReq();
+        req.body = {
+            to: 'user@example.com',
+            templateName: 'welcome',
+            variables: { name: 'Yash' },
+        };
+        const res = makeRes();
+
+        mockProjectConfig({
+            _id: 'proj_1',
+            resendApiKey: null,
+        });
+
+        MailTemplate.findOne.mockReturnValueOnce({
+            lean: jest.fn().mockResolvedValue({
+                _id: 'tpl_db_1',
+                name: 'welcome',
+                subject: 'Hello {{name}}',
+                text: 'Welcome to project!',
+                html: '<p>Welcome to project!</p>',
+                projectId: 'proj_1'
+            })
+        });
+
+        decrypt.mockReturnValue(null);
+        redis.eval.mockResolvedValue(1);
+
+        await mailController.sendMail(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(200);
+        expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+            success: true,
+            data: expect.objectContaining({
+                templateUsed: expect.objectContaining({ name: 'welcome', id: 'tpl_db_1', scope: 'project' }),
+            }),
+        }));
+    });
+
+    test('renders and sends a global mail template from DB when no project template exists', async () => {
+        const req = makeReq();
+        req.body = {
+            to: 'user@example.com',
+            templateName: 'welcome',
+            variables: { name: 'Yash' },
+        };
+        const res = makeRes();
+
+        mockProjectConfig({
+            _id: 'proj_1',
+            resendApiKey: null,
+        });
+
+        // First call: project scope (returns null)
+        MailTemplate.findOne.mockReturnValueOnce({
+            lean: jest.fn().mockResolvedValue(null)
+        });
+
+        // Second call: global scope
+        MailTemplate.findOne.mockReturnValueOnce({
+            lean: jest.fn().mockResolvedValue({
+                _id: 'tpl_global_1',
+                name: 'welcome',
+                subject: 'Global Hello {{name}}',
+                text: 'Global welcome!',
+                html: '<p>Global welcome!</p>',
+                projectId: null,
+                isSystem: true
+            })
+        });
+
+        decrypt.mockReturnValue(null);
+        redis.eval.mockResolvedValue(1);
+
+        await mailController.sendMail(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(200);
+        expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+            success: true,
+            data: expect.objectContaining({
+                templateUsed: expect.objectContaining({ name: 'welcome', id: 'tpl_global_1', scope: 'global' }),
+            }),
+        }));
     });
 
     test('refunds quota on terminal async worker failure', async () => {

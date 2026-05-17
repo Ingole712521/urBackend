@@ -553,7 +553,10 @@ module.exports.updateWebhookSchema = z.object({
 
 module.exports.sendMailSchema = z
   .object({
-    to: z.string().email("Invalid recipient email format"),
+    to: z.union([
+      z.string().email("Invalid recipient email format"),
+      z.array(z.string().email("Invalid recipient email format")).nonempty("Recipient list cannot be empty")
+    ]),
 
     // Direct-send fields (backward compatible)
     subject: z.preprocess(
