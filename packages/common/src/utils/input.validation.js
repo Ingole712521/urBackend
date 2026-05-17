@@ -362,7 +362,6 @@ const sanitize = (obj) => {
   if (obj === null || typeof obj !== 'object') {
     return obj;
   }
-
   const clean = {};
 
   for (const key of Object.keys(obj)) {
