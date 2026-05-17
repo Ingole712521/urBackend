@@ -339,35 +339,42 @@ module.exports.aggregateSchema = z.object({
     .min(1, "Pipeline must contain at least one stage."),
 });
 
-module.exports.sanitize = (obj) => {
+const BLOCKED_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+const isDangerousKey = (key) =>
+  key.startsWith('$') || BLOCKED_KEYS.has(key);
+
+const sanitizeValue = (value) => {
+  if (Array.isArray(value)) return value.map(sanitizeValue);
+
+  if (value !== null && typeof value === 'object') {
+    return sanitize(value);
+  }
+
+  return value;
+};
+
+const sanitize = (obj) => {
+  if (Array.isArray(obj)) {
+    return obj.map(sanitizeValue);
+  }
+
+  if (obj === null || typeof obj !== 'object') {
+    return obj;
+  }
+
   const clean = {};
-  for (const key in obj) {
-    if (!key.startsWith("$")) {
-      clean[key] = obj[key];
+
+  for (const key of Object.keys(obj)) {
+    if (!isDangerousKey(key)) {
+      clean[key] = sanitizeValue(obj[key]);
     }
   }
+
   return clean;
 };
 
-module.exports.sanitizeObjectId = (value) => {
-  if (typeof value !== "string") return null;
-  const normalized = value.trim();
-  if (!normalized) return null;
-  return mongoose.Types.ObjectId.isValid(normalized) ? normalized : null;
-};
-
-module.exports.sanitizeNonEmptyString = (value, options = {}) => {
-  if (typeof value !== "string") return null;
-
-  const { maxLength = 1024, allowNullByte = false } = options;
-  const normalized = value.trim();
-
-  if (!normalized) return null;
-  if (normalized.length > maxLength) return null;
-  if (!allowNullByte && normalized.includes("\0")) return null;
-
-  return normalized;
-};
+module.exports.sanitize = sanitize;
 
 const emptyToUndefined = z.preprocess(
   (val) => (val === "" || val === null ? undefined : val),
