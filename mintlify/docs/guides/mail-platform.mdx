@@ -259,7 +259,7 @@ curl "https://dashboard-api.ub.bitbros.in/api/projects/<projectId>/mail/logs" \
 ### Live status
 
 - Public: `GET /api/mail/logs/:resendId`
-- Dashboard: `GET /:projectId/mail/logs/:resendId/live`
+- Dashboard: `GET /api/projects/:projectId/mail/logs/:resendId/live`
 
 Use live status when you need real-time provider status. Use stored logs for analytics/history and low-latency UI lists.
 
