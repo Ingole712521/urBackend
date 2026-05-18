@@ -6,6 +6,8 @@ const crypto = require('crypto');
 const {redis} = require('@urbackend/common');
 const {Project} = require('@urbackend/common');
 const { authEmailQueue } = require('@urbackend/common');
+const { checkLockout, recordFailedAttempt, clearLockout } = require('@urbackend/common');
+const { AppError } = require('@urbackend/common');
 const { getRefreshSession, persistRefreshSession, revokeSessionChain } = require('@urbackend/common');
 const { loginSchema, userSignupSchema, resetPasswordSchema, onlyEmailSchema, verifyOtpSchema, changePasswordSchema, sanitize } = require('@urbackend/common');
 const { getConnection } = require('@urbackend/common');
@@ -1004,6 +1006,13 @@ module.exports.signup = async (req, res) => {
         // Model.create handles validation and default values
         const result = await Model.create(newUserPayload);
 
+        try {
+            // Fail-open: if Redis is unavailable, do not block successful signup.
+            await clearLockout(String(project._id), normalizedEmail);
+        } catch (lockErr) {
+            console.error('[login-lockout] clearLockout failed after signup:', lockErr?.message || lockErr);
+        }
+
         await redis.set(`project:${project._id}:otp:verification:${normalizedEmail}`, otp, 'EX', 300);
         await setPublicOtpCooldown(project._id, normalizedEmail, 'verification');
 
@@ -1046,11 +1055,34 @@ module.exports.signup = async (req, res) => {
  * Issues access and refresh tokens upon successful authentication.
  * @route POST /api/userAuth/login
  */
-module.exports.login = async (req, res) => {
+module.exports.login = async (req, res, next) => {
+    const sendAuthError = (statusCode, message) => {
+        if (typeof next === 'function') {
+            return next(new AppError(statusCode, message));
+        }
+        // Fallback for direct responses: use the project's standard API envelope
+        return res.status(statusCode).json({ success: false, data: {}, message });
+    };
+
+    const sendLockoutServiceError = (message = 'Login lockout service unavailable') => sendAuthError(503, message);
+
     try {
         const project = req.project;
         const { email, password } = loginSchema.parse(req.body);
         const normalizedEmail = email.toLowerCase().trim();
+        const projectId = String(project._id);
+
+        let lockStatus = { locked: false, retryAfterSeconds: 0 };
+        try {
+            lockStatus = await checkLockout(projectId, normalizedEmail);
+        } catch (lockErr) {
+            console.error('[login-lockout] checkLockout failed:', lockErr?.message || lockErr);
+            return sendLockoutServiceError();
+        }
+
+        if (lockStatus.locked) {
+            return sendAuthError(423, `Account temporarily locked. Try again in ${lockStatus.retryAfterSeconds} seconds.`);
+        }
 
         const usersColConfig = project.collections.find(c => c.name === 'users');
         if (!usersColConfig) return res.status(404).json({ error: "Auth collection not found" });
@@ -1060,10 +1092,43 @@ module.exports.login = async (req, res) => {
 
         const user = await Model.findOne({ email: normalizedEmail }).select('+password');
 
-        if (!user) return res.status(400).json({ error: "Invalid email or password" });
+        if (!user) {
+            let failedStatus = { locked: false, retryAfterSeconds: 0, attempts: 0 };
+            try {
+                failedStatus = await recordFailedAttempt(projectId, normalizedEmail);
+            } catch (attemptErr) {
+                console.error('[login-lockout] recordFailedAttempt failed (user missing):', attemptErr?.message || attemptErr);
+                return sendLockoutServiceError();
+            }
+
+            if (failedStatus.locked) {
+                return sendAuthError(423, `Account temporarily locked. Try again in ${failedStatus.retryAfterSeconds} seconds.`);
+            }
+            return sendAuthError(400, 'Invalid email or password');
+        }
 
         const validPass = await bcrypt.compare(password, user.password);
-        if (!validPass) return res.status(400).json({ error: "Invalid email or password" });
+        if (!validPass) {
+            let failedStatus = { locked: false, retryAfterSeconds: 0, attempts: 0 };
+            try {
+                failedStatus = await recordFailedAttempt(projectId, normalizedEmail);
+            } catch (attemptErr) {
+                console.error('[login-lockout] recordFailedAttempt failed (invalid password):', attemptErr?.message || attemptErr);
+                return sendLockoutServiceError();
+            }
+
+            if (failedStatus.locked) {
+                return sendAuthError(423, `Account temporarily locked. Try again in ${failedStatus.retryAfterSeconds} seconds.`);
+            }
+            return sendAuthError(400, 'Invalid email or password');
+        }
+
+        try {
+            // Fail-open: if Redis is unavailable, do not block successful login.
+            await clearLockout(projectId, normalizedEmail);
+        } catch (clearErr) {
+            console.error('[login-lockout] clearLockout failed:', clearErr?.message || clearErr);
+        }
 
         const issuedTokens = await issueAuthTokens({
             project,
@@ -1388,6 +1453,13 @@ module.exports.resetPasswordUser = async (req, res) => {
         );
 
         if (result.matchedCount === 0) return res.status(404).json({ error: "User not found" });
+
+        try {
+            // Fail-open: if Redis is unavailable, do not block password recovery success.
+            await clearLockout(String(project._id), normalizedEmail);
+        } catch (lockErr) {
+            console.error('[login-lockout] clearLockout failed after password reset:', lockErr?.message || lockErr);
+        }
 
         await redis.del(redisKey);
         res.json({ message: "Password updated successfully" });
