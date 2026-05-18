@@ -16,6 +16,7 @@ const csurf = require('csurf');
 const rateLimit = require('express-rate-limit');
 
 
+const projectRoutes = require('./routes/project.routes');
 const app = express();
 app.set('trust proxy', 1);
 
@@ -92,6 +93,9 @@ app.get('/api/server-ip', async (req, res) => {
 app.get('/', (req, res) => {
     res.status(200).json({ status: "success", message: "urBackend API is running 🚀" })
 });
+
+// Mount project routes
+app.use('/api/projects', projectRoutes);
 
 app.use((err, req, res, next) => {
     // CSRF Error Handling
