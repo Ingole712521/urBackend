@@ -116,7 +116,7 @@ app.use('/api/analytics', dashboardLimiter, analyticsRoute);
 app.use('/api/billing', billingRoute);
 app.use('/api/events', dashboardLimiter, eventsRoute);
 app.use('/api/admin/metrics', dashboardLimiter, adminMetricsRoute);
-
+app.use('/api/')
 
 
 

@@ -50,6 +50,7 @@ const {
 
 const { createAdminUser, resetPassword, getUserDetails, updateAdminUser, listUserSessions, revokeUserSession } = require('../controllers/userAuth.controller');
 
+const exportController = require('../controllers/dbExport.controller');
 
 // POST REQ FOR CREATE PROJECT
 router.post('/', authMiddleware, verifyEmail, planEnforcement.checkProjectLimit, createProject);
@@ -151,5 +152,8 @@ router.put('/:projectId/admin/users/:userId', authMiddleware, loadProjectForAdmi
 // SESSION MANAGEMENT (Admin)
 router.get('/:projectId/admin/users/:userId/sessions', authMiddleware, loadProjectForAdmin, checkAuthEnabled, listUserSessions);
 router.delete('/:projectId/admin/users/:userId/sessions/:tokenId', authMiddleware, loadProjectForAdmin, checkAuthEnabled, revokeUserSession);
+
+// POST req for DB EXPORT
+router.post('/:projectId/export', authMiddleware, exportController.dbExportHandler);
 
 module.exports = router;
