@@ -3,17 +3,22 @@ const { Developer } = require('@urbackend/common');
 const { Project } = require('@urbackend/common');
 const { exportQueue } = require('@urbackend/common');
 const { redis } = require('@urbackend/common');
+const { getProjectById, setProjectById } = require('@urbackend/common');
 
 module.exports.dbExportHandler = async (req, res, next) => {
     try {
         const { projectId } = req.params;
         const { _id: userId } = req.user;
 
-        
-        const project = await Project.findById(projectId).select('owner').lean();
+        let project = await getProjectById(projectId);
         if (!project) {
-            return next(new AppError(404, "Project not found."));
+            project = await Project.findById(projectId).lean();
+            if (!project) {
+                return next(new AppError(404, "Project not found."));
+            }
+            await setProjectById(projectId, project);
         }
+
         if (project.owner.toString() !== userId.toString()) {
             return next(new AppError(403, "Access denied. You are not the owner of this project."));
         }
