@@ -2,6 +2,9 @@ name-template: 'v$RESOLVED_VERSION'
 tag-template: 'v$RESOLVED_VERSION'
 
 version-resolver:
+  major:
+    labels:
+      - 'breaking'
   minor:
     labels:
       - 'feature'
@@ -11,6 +14,7 @@ version-resolver:
       - 'bug'
       - 'chore'
       - 'documentation'
+      - 'security'
   default: patch
 
 categories:
@@ -21,9 +25,18 @@ categories:
   - title: '🐛 Fixed'
     labels:
       - 'bug'
+  - title: '🔒 Security'
+    labels:
+      - 'security'
+  - title: '💥 Breaking Changes'
+    labels:
+      - 'breaking'
   - title: '📝 Documentation'
     labels:
       - 'documentation'
+  - title: '🧹 Chore'
+    labels:
+      - 'chore'
 
 change-template: '- $TITLE @$AUTHOR (#$NUMBER)'
 change-title-escapes: '\<*_&'
