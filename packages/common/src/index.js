@@ -51,7 +51,6 @@ const {
 const {
   trashCleanupQueue,
   enqueueCollectionCleanup,
-  scheduleTrashCleanup,
   initTrashCleanupWorker,
 } = require("./queues/trashCleanupQueue");
 
@@ -213,6 +212,5 @@ module.exports = {
   clearLockout,
   trashCleanupQueue,
   enqueueCollectionCleanup,
-  scheduleTrashCleanup,
   initTrashCleanupWorker,
 };

@@ -25,7 +25,7 @@ const {initWebhookWorker} = require('@urbackend/common');
 const {initAuthEmailWorker, initPublicEmailWorker} = require('@urbackend/common');
 const {initActivityRollupWorker, scheduleActivityRollup} = require('@urbackend/common');
 const {initReliabilityAlertWorker, scheduleReliabilityAlert} = require('@urbackend/common');
-const {initTrashCleanupWorker, scheduleTrashCleanup} = require('@urbackend/common');
+const {initTrashCleanupWorker} = require('@urbackend/common');
 
 app.use('/api/mail/webhook', express.raw({ type: 'application/json' }));
 app.use(express.json());
@@ -139,9 +139,6 @@ if (process.env.NODE_ENV !== 'test') {
             console.error('[ReliabilityAlert] Failed to schedule cron:', err.message)
         );
         initTrashCleanupWorker();
-        scheduleTrashCleanup().catch((err) =>
-            console.error('[TrashCleanup] Failed to schedule cron:', err.message)
-        );
     };
 
     const bootstrap = async () => {

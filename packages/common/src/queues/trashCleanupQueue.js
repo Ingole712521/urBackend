@@ -5,195 +5,152 @@ const { getConnection } = require('../utils/connection.manager');
 const { getCompiledModel } = require('../utils/injectModel');
 
 const QUEUE_NAME = 'trash-cleanup-queue';
-
 const trashCleanupQueue = new Queue(QUEUE_NAME, { connection });
 
 /**
- * Enqueue a specific collection for soft-delete cleanup.
- * Uses jobId for deduplication so multiple deletes before the cron runs
- * only result in a single cleanup job.
+ * Enqueue a cleanup job for a specific collection.
  */
-async function enqueueCollectionCleanup(projectId, collectionName) {
+async function enqueueCollectionCleanup(projectId, collectionName, delay = 0) {
   try {
+    const jobId = `${projectId}:${collectionName}`;
+    
+    // Safely remove existing job
+    const oldJob = await trashCleanupQueue.getJob(jobId);
+    if (oldJob) {
+        try { await oldJob.remove(); } catch (e) { console.warn(`[TrashCleanup] Could not remove existing job ${jobId}:`, e.message); }
+    }
+
     await trashCleanupQueue.add(
       'cleanup-collection',
       { projectId, collectionName },
       {
-        jobId: `${projectId}:${collectionName}`, // Deduplication
-        removeOnComplete: true,
-        removeOnFail: true,
+        jobId: jobId,
+        delay: Math.max(delay, 0),
         attempts: 3,
-        backoff: { type: 'exponential', delay: 2000 }
+        backoff: { type: 'exponential', delay: 5000 },
+        removeOnComplete: { age: 86400 },
+        removeOnFail: true,
       }
     );
   } catch (err) {
-    console.error(`[TrashCleanup] Failed to enqueue collection cleanup for ${projectId}:${collectionName}`, err.message);
+    console.error(`[TrashCleanup] Failed to enqueue cleanup for ${projectId}:${collectionName}:`, err.message);
+    throw err;
   }
 }
 
 /**
- * Schedule the weekly trash cleanup job (fallback scan).
- * Runs at Wednesday 21:30 UTC = Thursday 03:00 IST.
+ * Process a collection cleanup job.
  */
-async function scheduleTrashCleanup() {
-  const existing = await trashCleanupQueue.getRepeatableJobs();
-  for (const job of existing) {
-    if (job.name === 'weekly-trash-cleanup' || job.name === 'daily-trash-cleanup') {
-      await trashCleanupQueue.removeRepeatableByKey(job.key);
-    }
-  }
+async function processCollectionCleanup(projectId, collectionName) {
+  const project = await Project.findById(projectId).lean();
+  if (!project) return;
 
-  await trashCleanupQueue.add(
-    'weekly-trash-cleanup',
-    {},
-    {
-      repeat: { 
-        pattern: '30 21 * * 3', // Wednesday 21:30 UTC
-        tz: 'UTC'
-      },
-      removeOnComplete: true,
-      removeOnFail: true,
-    }
-  );
-  console.log('[TrashCleanup] Weekly fallback cron scheduled (Thu 03:00 IST)');
-}
+  const collectionConfig = project.collections.find(c => c.name === collectionName);
+  if (!collectionConfig) return;
 
-async function processCollectionCleanup(project, collectionConfig, projectConn) {
-  const BATCH_SIZE = 500;
-
+  const projectConn = await getConnection(projectId);
   const Model = getCompiledModel(
     projectConn,
     collectionConfig,
-    project._id,
+    projectId,
     project.resources.db.isExternal
   );
 
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  let totalReclaimedBytes = 0;
 
-  const deleteFilter = {
-    isDeleted: true,
-    deletedAt: { $lt: thirtyDaysAgo },
-  };
-
-  let totalDocsDeleted = 0;
-  let totalSpaceReclaimed = 0;
-
+  // 1. Batch-delete expired soft-deleted docs
   while (true) {
-    // Fetch a batch of IDs to delete and accurately measure their storage size using $bsonSize
-    const docsBatch = await Model.aggregate([
-      { $match: deleteFilter },
-      { $limit: BATCH_SIZE },
-      { $project: { _id: 1, size: { $bsonSize: "$$ROOT" } } }
-    ]);
-
-    if (docsBatch.length === 0) {
-      break;
+    let batch;
+    try {
+        batch = await Model.aggregate([
+          { $match: { isDeleted: true, deletedAt: { $lt: thirtyDaysAgo } } },
+          { $limit: 500 },
+          { $project: { _id: 1, bsonSize: { $bsonSize: '$$ROOT' } } },
+        ]);
+    } catch (e) {
+        // Fallback for older Mongo versions without $bsonSize
+        batch = await Model.find({ isDeleted: true, deletedAt: { $lt: thirtyDaysAgo } })
+            .select('_id')
+            .limit(500)
+            .lean();
     }
 
-    const idsToDelete = docsBatch.map(d => d._id);
-    const batchSizeBytes = docsBatch.reduce((sum, d) => sum + (d.size || 1024), 0);
+    if (!batch.length) break;
 
-    const result = await Model.deleteMany({
-      _id: { $in: idsToDelete },
-      ...deleteFilter,
+    const ids = batch.map(d => d._id);
+    const reclaimedBytes = batch.reduce((sum, d) => sum + (d.bsonSize || 1024), 0);
+
+    const { deletedCount } = await Model.deleteMany({ 
+        _id: { $in: ids },
+        isDeleted: true,
+        deletedAt: { $lt: thirtyDaysAgo }
     });
+    totalReclaimedBytes += (reclaimedBytes * (deletedCount / ids.length));
 
-    if (result && result.deletedCount > 0) {
-      const ratio = result.deletedCount / docsBatch.length;
-      const reclaimedForBatch = Math.round(batchSizeBytes * ratio);
-      
-      totalDocsDeleted += result.deletedCount;
-      totalSpaceReclaimed += reclaimedForBatch;
-      console.log(`[TrashCleanup] Attempted ${docsBatch.length}, deleted ${result.deletedCount} documents (approx ${reclaimedForBatch} bytes) from ${project.name}.${collectionConfig.name}`);
-    }
-    
-    // Break if we processed fewer than BATCH_SIZE (no more to fetch)
-    // or if nothing was deleted (failsafe to prevent infinite loop)
-    if (docsBatch.length < BATCH_SIZE || result.deletedCount === 0) {
-      break;
-    }
+    if (batch.length < 500) break;
   }
 
-  if (totalDocsDeleted > 0 && !project.resources.db.isExternal) {
-    // Single atomic pipeline update using $max to ensure it doesn't go below 0
+  // 2. Atomic databaseUsed decrement
+  if (totalReclaimedBytes > 0 && !project.resources.db.isExternal) {
     await Project.updateOne(
-      { _id: project._id },
-      [
-        { 
-          $set: { 
-            databaseUsed: { 
-              $max: [0, { $subtract: [{ $ifNull: ['$databaseUsed', 0] }, totalSpaceReclaimed] }] 
-            } 
+      { _id: projectId },
+      [{ 
+        $set: { 
+          databaseUsed: { 
+            $max: [0, { $subtract: [{ $ifNull: ['$databaseUsed', 0] }, totalReclaimedBytes] }] 
           } 
-        }
-      ]
+        } 
+      }]
     );
   }
+
+  // 3. Self-schedule
+  const nextPending = await Model.findOne(
+    { isDeleted: true, deletedAt: { $gte: thirtyDaysAgo } },
+    { deletedAt: 1 },
+    { sort: { deletedAt: 1 } }
+  ).lean();
+
+  if (nextPending && nextPending.deletedAt) {
+    const nextRunDelay = nextPending.deletedAt.getTime() + 30 * 24 * 60 * 60 * 1000 - Date.now();
+    const delay = Math.max(nextRunDelay, 0);
+    await enqueueCollectionCleanup(projectId, collectionName, delay);
+  }
 }
 
-/**
- * Run the full fallback scan logic.
- */
 async function runFullTrashCleanup() {
-  console.log('[TrashCleanup] Starting weekly fallback cleanup...');
-  
+  console.log('[TrashCleanup] Starting manual full sweep...');
   const projects = await Project.find({}).lean();
-
   for (const project of projects) {
-    try {
-      const projectConn = await getConnection(project._id);
-      for (const collectionConfig of project.collections) {
-        await processCollectionCleanup(project, collectionConfig, projectConn);
-      }
-    } catch (err) {
-      console.error(`[TrashCleanup] Failed to clean trash for project ${project._id}:`, err.message);
+    for (const col of project.collections) {
+      await enqueueCollectionCleanup(project._id.toString(), col.name);
     }
   }
-
-  console.log('[TrashCleanup] Weekly fallback cleanup finished.');
 }
 
-/**
- * Initialize the BullMQ worker for trash cleanup.
- */
 function initTrashCleanupWorker() {
   const worker = new Worker(
     QUEUE_NAME,
     async (job) => {
-      if (job.name === 'cleanup-collection') {
-        const { projectId, collectionName } = job.data;
-        console.log(`[TrashCleanup] Processing targeted cleanup for ${projectId}:${collectionName}`);
-        
-        const project = await Project.findById(projectId).lean();
-        if (!project) return;
-        
-        const collectionConfig = project.collections.find(c => c.name === collectionName);
-        if (!collectionConfig) return;
-
-        const projectConn = await getConnection(project._id);
-        await processCollectionCleanup(project, collectionConfig, projectConn);
-
-      } else if (job.name === 'weekly-trash-cleanup') {
-        await runFullTrashCleanup();
-      }
+      const { projectId, collectionName } = job.data;
+      await processCollectionCleanup(projectId, collectionName);
     },
     { connection, concurrency: 1 }
   );
 
-  worker.on('completed', (job) => console.log(`[TrashCleanup] Job ${job.name} completed successfully`));
+  worker.on('completed', (job) => console.log(`[TrashCleanup] Job ${job.id} completed successfully`));
   worker.on('failed', (job, err) =>
-    console.error(`[TrashCleanup] Job ${job.name} failed:`, err.message)
+    console.error(`[TrashCleanup] Job ${job ? job.id : 'unknown'} failed:`, err.message)
   );
 
-  console.log('[TrashCleanup] Worker initialized');
   return worker;
 }
 
 module.exports = {
   trashCleanupQueue,
   enqueueCollectionCleanup,
-  scheduleTrashCleanup,
   initTrashCleanupWorker,
-  runFullTrashCleanup
+  runFullTrashCleanup,
+  processCollectionCleanup
 };
