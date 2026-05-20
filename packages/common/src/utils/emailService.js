@@ -312,8 +312,6 @@ ${downloadUrl}
 Thanks,
 urBackend Team`;
 
-        console.log("we are he re")
-
         const { data, error } = await resend.emails.send({
             from: '"urBackend" <onboarding@resend.dev>',
             to: to,
