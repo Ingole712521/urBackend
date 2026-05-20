@@ -1,0 +1,85 @@
+name: Weekly Mintlify Changelog
+
+on:
+  schedule:
+    - cron: '0 9 * * 1'  # Every Monday at 9:00 AM UTC
+  workflow_dispatch:      # Allow manual trigger from Actions tab
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  generate-changelog:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e
+        with:
+          node-version: '20'
+
+      - name: Get merged PRs from last 7 days
+        id: get-prs
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea
+        with:
+          script: |
+            const since = new Date();
+            since.setDate(since.getDate() - 7);
+
+            const { data: pulls } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'closed',
+              sort: 'updated',
+              direction: 'desc',
+              per_page: 50
+            });
+
+            const merged = pulls.filter(pr =>
+              pr.merged_at && new Date(pr.merged_at) >= since
+            );
+
+            const summary = merged.map(pr =>
+              `#${pr.number} - ${pr.title} (@${pr.user.login})`
+            ).join('\n');
+
+            console.log('Merged PRs:\n' + summary);
+            core.setOutput('pr_summary', summary || 'No PRs merged this week.');
+            core.setOutput('pr_count', merged.length.toString());
+
+      - name: Generate changelog entry via Groq
+        id: generate
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          PR_SUMMARY: ${{ steps.get-prs.outputs.pr_summary }}
+          PR_COUNT: ${{ steps.get-prs.outputs.pr_count }}
+        run: |
+          node .github/scripts/generate-changelog-entry.js "$PR_SUMMARY" "$PR_COUNT" > changelog_entry.md
+          echo "Generated changelog entry:"
+          cat changelog_entry.md
+
+      - name: Prepend entry to CHANGELOG.md
+        run: |
+          TODAY=$(date +%Y-%m-%d)
+          echo "## [Unreleased] - $TODAY" > temp_entry.md
+          echo "" >> temp_entry.md
+          cat changelog_entry.md >> temp_entry.md
+          echo "" >> temp_entry.md
+
+          # Insert after the ## [Unreleased] placeholder line in CHANGELOG.md
+          awk '/^## \[Unreleased\]/{print; while((getline line < "temp_entry.md") > 0) print line; next} 1' CHANGELOG.md > CHANGELOG_new.md
+          mv CHANGELOG_new.md CHANGELOG.md
+
+      - name: Commit and push changelog update
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add CHANGELOG.md
+          git diff --staged --quiet || git commit -m "docs: weekly changelog update $(date +%Y-%m-%d)"
+          git push

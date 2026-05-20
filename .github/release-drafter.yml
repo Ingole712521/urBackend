@@ -18,23 +18,23 @@ version-resolver:
   default: patch
 
 categories:
-  - title: '🚀 Added'
+  - title: 'Added'
     labels:
       - 'feature'
       - 'enhancement'
-  - title: '🐛 Fixed'
+  - title: 'Fixed'
     labels:
       - 'bug'
-  - title: '🔒 Security'
+  - title: 'Security'
     labels:
       - 'security'
-  - title: '💥 Breaking Changes'
+  - title: 'Breaking Changes'
     labels:
       - 'breaking'
-  - title: '📝 Documentation'
+  - title: 'Documentation'
     labels:
       - 'documentation'
-  - title: '🧹 Chore'
+  - title: 'Chore'
     labels:
       - 'chore'
 
