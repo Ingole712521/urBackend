@@ -1,4 +1,8 @@
+const dotenv = require('dotenv');
+dotenv.config({ path: require('path').join(__dirname, '../../../.env') });
+
 const { Worker } = require('bullmq');
+const mongoose = require('mongoose')
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
@@ -13,12 +17,18 @@ const {
     getBucket 
 } = require('@urbackend/common');
 
+const { validateEnv } = require('@urbackend/common');
+
+if (process.env.NODE_ENV !== 'test') {
+    validateEnv();
+}
+
 const initExportWorker = () => {
     const worker = new Worker(exportQueue.name, async (job) => {
         const { projectId, userId, email } = job.data;
         console.log(`[ExportWorker] Starting export for project ${projectId} requested by ${email}`);
 
-        const project = await Project.findById(projectId).select('+resources.storage.config.encrypted +resources.storage.config.iv +resources.storage.config.tag resources.storage.isExternal storageUsed storageLimit');
+        const project = await Project.findById(projectId);
         if (!project) throw new Error('Project not found');
 
         const connection = await getConnection(projectId);
@@ -88,7 +98,32 @@ const initExportWorker = () => {
         }
     }, { connection: redis, concurrency: 2 });
 
+    worker.on('completed', (job) => {
+        console.log(`[ExportWorker] Job ${job.id} for project ${job.data.projectId} completed.`);
+    });
+
+    worker.on('failed', (job, err) => {
+        console.error(`[ExportWorker] Job ${job?.id} for project ${job?.data?.projectId} failed:`, err.message);
+    });
+
     return worker;
 };
 
+if (require.main === module) {
+
+    const { connectDB } = require('@urbackend/common');
+
+    (async () => {
+        try {
+            await connectDB();
+
+            initExportWorker();
+
+            console.log('[CONSUMER] Export worker started and listening for jobs...');
+        } catch (err) {
+            console.error('Failed to start worker:', err);
+            process.exit(1);
+        }
+    })();
+}
 module.exports = { initExportWorker };
