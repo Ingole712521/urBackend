@@ -12,12 +12,16 @@ const trashCleanupQueue = new Queue(QUEUE_NAME, { connection });
  */
 async function enqueueCollectionCleanup(projectId, collectionName, delay = 0) {
   try {
-    const jobId = `${projectId}:${collectionName}`;
+    const baseJobId = `${encodeURIComponent(projectId)}-${encodeURIComponent(collectionName)}`;
+    const jobId = delay > 0 ? `${baseJobId}-${Date.now()}` : baseJobId;
     
-    // Safely remove existing job
-    const oldJob = await trashCleanupQueue.getJob(jobId);
+    // Only remove non-active jobs to avoid BullMQ state errors
+    const oldJob = await trashCleanupQueue.getJob(baseJobId);
     if (oldJob) {
-        try { await oldJob.remove(); } catch (e) { console.warn(`[TrashCleanup] Could not remove existing job ${jobId}:`, e.message); }
+      const state = await oldJob.getState();
+      if (state === 'delayed' || state === 'waiting') {
+        try { await oldJob.remove(); } catch (e) { console.warn(`[TrashCleanup] Could not remove existing job ${baseJobId}:`, e.message); }
+      }
     }
 
     await trashCleanupQueue.add(

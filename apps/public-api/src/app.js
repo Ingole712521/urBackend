@@ -125,6 +125,7 @@ if (process.env.NODE_ENV !== 'test') {
     const PORT = process.env.USER_PORT || 1235;
 
     const { connectDB } = require('@urbackend/common');
+    let trashCleanupWorker;
 
     const startWorkers = () => {
         initWebhookWorker();
@@ -138,7 +139,7 @@ if (process.env.NODE_ENV !== 'test') {
         scheduleReliabilityAlert().catch((err) =>
             console.error('[ReliabilityAlert] Failed to schedule cron:', err.message)
         );
-        initTrashCleanupWorker();
+        trashCleanupWorker = initTrashCleanupWorker();
     };
 
     const bootstrap = async () => {
@@ -152,6 +153,15 @@ if (process.env.NODE_ENV !== 'test') {
         // SHUTDOWN
         const gracefulShutdown = async () => {
             console.log('🛑 SIGTERM/SIGINT received. Shutting down gracefully...');
+
+            if (trashCleanupWorker) {
+                try {
+                    await trashCleanupWorker.close();
+                    console.log('✅ Trash cleanup worker closed.');
+                } catch (err) {
+                    console.error('❌ Error closing trash cleanup worker:', err);
+                }
+            }
 
             server.close(async () => {
                 console.log('✅ HTTP server closed.');
