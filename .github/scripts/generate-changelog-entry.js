@@ -1,5 +1,11 @@
 const https = require("https");
 
+// Fail fast if GROQ_API_KEY is not set
+if (!process.env.GROQ_API_KEY) {
+  console.error("Error: GROQ_API_KEY environment variable is not set.");
+  process.exit(1);
+}
+
 const prSummary = process.argv[2] || "No PRs merged this week.";
 const prCount = process.argv[3] || "0";
 
@@ -74,6 +80,13 @@ const req = https.request(options, (res) => {
       process.exit(1);
     }
   });
+});
+
+// Add timeout to prevent workflow from hanging indefinitely
+req.setTimeout(30000, () => {
+  console.error("Error: Groq API request timed out after 30 seconds.");
+  req.destroy();
+  process.exit(1);
 });
 
 req.on("error", (err) => {

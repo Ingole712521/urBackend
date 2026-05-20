@@ -7,7 +7,7 @@ on:
 
 permissions:
   contents: write
-  pull-requests: read
+  pull-requests: write
 
 jobs:
   generate-changelog:
@@ -32,13 +32,13 @@ jobs:
             const since = new Date();
             since.setDate(since.getDate() - 7);
 
-            const { data: pulls } = await github.rest.pulls.list({
+            const pulls = await github.paginate(github.rest.pulls.list, {
               owner: context.repo.owner,
               repo: context.repo.repo,
               state: 'closed',
               sort: 'updated',
               direction: 'desc',
-              per_page: 50
+              per_page: 100
             });
 
             const merged = pulls.filter(pr =>
@@ -72,14 +72,25 @@ jobs:
           cat changelog_entry.md >> temp_entry.md
           echo "" >> temp_entry.md
 
-          # Insert after the ## [Unreleased] placeholder line in CHANGELOG.md
           awk '/^## \[Unreleased\]/{print; while((getline line < "temp_entry.md") > 0) print line; next} 1' CHANGELOG.md > CHANGELOG_new.md
           mv CHANGELOG_new.md CHANGELOG.md
 
-      - name: Commit and push changelog update
+      - name: Open Pull Request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          BRANCH="changelog/week-of-$(date +%Y-%m-%d)"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
           git add CHANGELOG.md
-          git diff --staged --quiet || git commit -m "docs: weekly changelog update $(date +%Y-%m-%d)"
-          git push
+          git diff --staged --quiet && echo "No changes to commit" && exit 0
+          git commit -m "docs: weekly changelog update $(date +%Y-%m-%d)"
+          git push origin "$BRANCH"
+          gh pr create \
+            --repo ${{ github.repository }} \
+            --base main \
+            --head "$BRANCH" \
+            --title "docs: weekly changelog update $(date +%Y-%m-%d)" \
+            --body "Auto-generated weekly changelog entry. Please review before merging." \
+            --label "documentation"
