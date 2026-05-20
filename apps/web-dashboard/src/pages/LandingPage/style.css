@@ -88,10 +88,13 @@
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-    position: sticky;
+    position: fixed;
     top: 0;
+    left: 0;
+    right: 0;
     z-index: 100;
     transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    width: 100%;
 }
 
 .nav-scrolled {
@@ -326,6 +329,7 @@
     text-align: center;
     min-height: calc(100vh - 80px);
     justify-content: center;
+    margin-top: 10vh;
 }
 
 .status-pill {
