@@ -102,11 +102,11 @@ export default function Footer() {
 
                 .footer-nav-grid {
                     padding-top: 1rem;
-                    padding-left: 10rem;
+                    padding-left: clamp(0rem, 4vw, 3rem);
                     width: 100%;
                     display: flex;
                     flex-direction: row;
-                    gap: 8rem;
+                    gap: clamp(1.5rem, 3vw, 3rem);
                     flex-wrap: wrap;
                     justify-content: space-evenly;
                 }
