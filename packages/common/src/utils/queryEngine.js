@@ -29,9 +29,28 @@ class QueryEngine {
         const queryObj = { ...this.queryString };
         this.hasRegexFilter = false;
         
+        const includeDeleted = queryObj.include_deleted === 'true';
+        
+        // Prevent manual override of internal soft-delete fields
+        // Strip both exact matches and operator-suffixed variants (e.g., isDeleted_ne)
+        for (const key in queryObj) {
+            if (
+                key === 'include_deleted' ||
+                key.startsWith('isDeleted') ||
+                key.startsWith('deletedAt')
+            ) {
+                delete queryObj[key];
+            }
+        }
+
         QueryEngine.EXCLUDED_FIELDS.forEach(el => delete queryObj[el]);
 
         const mongoQuery = {};
+
+        if (!includeDeleted) {
+            mongoQuery.isDeleted = { $ne: true };
+        }
+
         for (const key in queryObj) {
             if (key.endsWith('_gt')) {
                 const field = key.replace(/_gt$/, '');

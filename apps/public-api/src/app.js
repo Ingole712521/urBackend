@@ -25,6 +25,7 @@ const {initWebhookWorker} = require('@urbackend/common');
 const {initAuthEmailWorker, initPublicEmailWorker} = require('@urbackend/common');
 const {initActivityRollupWorker, scheduleActivityRollup} = require('@urbackend/common');
 const {initReliabilityAlertWorker, scheduleReliabilityAlert} = require('@urbackend/common');
+const {initTrashCleanupWorker} = require('@urbackend/common');
 
 app.use('/api/mail/webhook', express.raw({ type: 'application/json' }));
 app.use(express.json());
@@ -124,6 +125,7 @@ if (process.env.NODE_ENV !== 'test') {
     const PORT = process.env.USER_PORT || 1235;
 
     const { connectDB } = require('@urbackend/common');
+    let trashCleanupWorker;
 
     const startWorkers = () => {
         initWebhookWorker();
@@ -137,6 +139,7 @@ if (process.env.NODE_ENV !== 'test') {
         scheduleReliabilityAlert().catch((err) =>
             console.error('[ReliabilityAlert] Failed to schedule cron:', err.message)
         );
+        trashCleanupWorker = initTrashCleanupWorker();
     };
 
     const bootstrap = async () => {
@@ -151,23 +154,33 @@ if (process.env.NODE_ENV !== 'test') {
         const gracefulShutdown = async () => {
             console.log('🛑 SIGTERM/SIGINT received. Shutting down gracefully...');
 
+            // Force close after 10s
+            const forceShutdown = setTimeout(() => {
+                console.error('Force shutting down...');
+                process.exit(1);
+            }, 10000);
+
+            if (trashCleanupWorker) {
+                try {
+                    await trashCleanupWorker.close();
+                    console.log('✅ Trash cleanup worker closed.');
+                } catch (err) {
+                    console.error('❌ Error closing trash cleanup worker:', err);
+                }
+            }
+
             server.close(async () => {
                 console.log('✅ HTTP server closed.');
                 try {
                     await mongoose.connection.close(false);
                     console.log('✅ MongoDB connection closed.');
+                    clearTimeout(forceShutdown);
                     process.exit(0);
                 } catch (err) {
                     console.error('❌ Error closing MongoDB connection:', err);
                     process.exit(1);
                 }
             });
-
-            // Force close after 10s
-            setTimeout(() => {
-                console.error('Force shutting down...');
-                process.exit(1);
-            }, 10000);
         };
 
         process.on('SIGTERM', gracefulShutdown);

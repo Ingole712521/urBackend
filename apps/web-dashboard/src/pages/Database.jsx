@@ -31,6 +31,7 @@ export default function Database() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
+  const [showDeleted, setShowDeleted] = useState(false);
   const [collectionToDelete, setCollectionToDelete] = useState(null);
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [editingRecord, setEditingRecord] = useState(null);
@@ -100,6 +101,9 @@ export default function Database() {
     setLoadingData(true);
     try {
       let queryStr = `?page=${queryParams.page}&limit=${queryParams.limit}&sort=${queryParams.sort}`;
+      if (showDeleted) {
+        queryStr += `&include_deleted=true`;
+      }
       queryParams.filters.forEach(f => {
          if (f.field && f.value !== '') queryStr += `&${f.field}${f.operator === '=' ? '' : f.operator}=${encodeURIComponent(f.value)}`;
       });
@@ -114,7 +118,7 @@ export default function Database() {
       }
     } catch { toast.error("Failed to load data"); }
     finally { setLoadingData(false); }
-  }, [activeCollection, projectId, queryParams]);
+  }, [activeCollection, projectId, queryParams, showDeleted]);
 
   useEffect(() => {
     if (!activeCollection) return;
@@ -201,6 +205,8 @@ export default function Database() {
                 setIsAddModalOpen(true);
               }}
               onOpenSidebar={() => setIsSidebarOpen(true)}
+              showDeleted={showDeleted}
+              setShowDeleted={setShowDeleted}
             />
 
             <div className="db-content" style={{ flex: 1, overflow: 'hidden', position: 'relative', display: 'flex', flexDirection: 'column' }}>

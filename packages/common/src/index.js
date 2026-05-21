@@ -38,8 +38,21 @@ const {
   initWebhookWorker,
   generateSignature,
 } = require("./queues/webhookQueue");
-const { activityRollupQueue, scheduleActivityRollup, initActivityRollupWorker } = require('./queues/activityRollupQueue');
-const { reliabilityAlertQueue, scheduleReliabilityAlert, initReliabilityAlertWorker } = require('./queues/reliabilityAlertQueue');
+const {
+  activityRollupQueue,
+  scheduleActivityRollup,
+  initActivityRollupWorker,
+} = require("./queues/activityRollupQueue");
+const {
+  reliabilityAlertQueue,
+  scheduleReliabilityAlert,
+  initReliabilityAlertWorker,
+} = require("./queues/reliabilityAlertQueue");
+const {
+  trashCleanupQueue,
+  enqueueCollectionCleanup,
+  initTrashCleanupWorker,
+} = require("./queues/trashCleanupQueue");
 
 // Middleware
 const checkAuthEnabled = require('./middleware/checkAuthEnabled')
@@ -197,4 +210,7 @@ module.exports = {
   checkLockout,
   recordFailedAttempt,
   clearLockout,
+  trashCleanupQueue,
+  enqueueCollectionCleanup,
+  initTrashCleanupWorker,
 };
