@@ -152,6 +152,11 @@ export default function Database() {
     } catch { toast.error("Failed to delete document"); }
   };
 
+  /**
+   * Generates an RLS-aware cURL snippet for the active collection.
+   * Uses the secret key if RLS is disabled, or the publishable key with a JWT if RLS is enabled.
+   * @returns {string} The cURL command snippet
+   */
   const getCurlSnippet = () => {
     if (!activeCollection) return '';
     return activeCollection.rls?.enabled
@@ -224,9 +229,13 @@ export default function Database() {
                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
                                 <span>Example POST Request</span>
                                 <button 
-                                    onClick={() => { 
-                                        navigator.clipboard.writeText(getCurlSnippet()); 
-                                        toast.success('Snippet copied!'); 
+                                    onClick={async () => { 
+                                        try {
+                                            await navigator.clipboard.writeText(getCurlSnippet()); 
+                                            toast.success('Snippet copied!'); 
+                                        } catch {
+                                            toast.error('Failed to copy snippet');
+                                        }
                                     }} 
                                     style={{ background: 'none', border: 'none', color: 'var(--color-primary)', cursor: 'pointer' }}
                                 >
