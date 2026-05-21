@@ -375,6 +375,26 @@ const sanitize = (obj) => {
 
 module.exports.sanitize = sanitize;
 
+module.exports.sanitizeObjectId = (value) => {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim();
+  if (!normalized) return null;
+  return mongoose.Types.ObjectId.isValid(normalized) ? normalized : null;
+};
+
+module.exports.sanitizeNonEmptyString = (value, options = {}) => {
+  if (typeof value !== "string") return null;
+
+  const { maxLength = 1024, allowNullByte = false } = options;
+  const normalized = value.trim();
+
+  if (!normalized) return null;
+  if (normalized.length > maxLength) return null;
+  if (!allowNullByte && normalized.includes("\0")) return null;
+
+  return normalized;
+};
+
 const emptyToUndefined = z.preprocess(
   (val) => (val === "" || val === null ? undefined : val),
   z.string().optional(),
