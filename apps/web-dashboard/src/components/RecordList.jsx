@@ -1,4 +1,4 @@
-import React from "react";
+import { useState, useEffect } from "react";
 import { List, MoreHorizontal, Calendar, ArrowRight, RotateCcw } from "lucide-react";
 
 const formatDate = (val) => {
@@ -17,8 +17,14 @@ const formatDate = (val) => {
     }).toLowerCase();
 };
 
-export default function RecordList({ data, activeCollection, onView, onRecover }) {
-    const [now] = React.useState(() => Date.now());
+export default function RecordList({ data, activeCollection, onView, onRecover, recoveringIds }) {
+    const [now, setNow] = useState(null);
+
+    useEffect(() => {
+        // Use setTimeout to avoid synchronous cascading render warning
+        const timer = setTimeout(() => setNow(Date.now()), 0);
+        return () => clearTimeout(timer);
+    }, []);
 
 
     // Helper to get important fields (skip _id and system fields)
@@ -94,17 +100,22 @@ export default function RecordList({ data, activeCollection, onView, onRecover }
                             </div>
 
                             <div className="record-actions">
-                                {record.isDeleted ? (
+                                {(record.isDeleted || recoveringIds.has(record._id)) ? (
                                     <button 
-                                        className="btn-icon"
+                                        className={`btn-icon ${recoveringIds.has(record._id) ? 'loading' : ''}`}
                                         title={getDeletionTooltip(record.deletedAt)}
                                         aria-label={`Recover record ${record._id}`}
+                                        disabled={recoveringIds.has(record._id)}
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             onRecover(record._id);
                                         }}
                                     >
-                                        <RotateCcw size={18} color="var(--color-primary)" />
+                                        {recoveringIds.has(record._id) ? (
+                                            <div className="spinner-small"></div>
+                                        ) : (
+                                            <RotateCcw size={18} color="var(--color-primary)" />
+                                        )}
                                     </button>
                                 ) : (
                                     <button className="btn-icon" aria-label={`Open record ${record._id}`}>
@@ -216,6 +227,23 @@ export default function RecordList({ data, activeCollection, onView, onRecover }
                 
                 .record-card:hover .record-actions {
                     color: white;
+                }
+                
+                .spinner-small {
+                    width: 14px;
+                    height: 14px;
+                    border: 2px solid rgba(255, 255, 255, 0.1);
+                    border-top: 2px solid var(--color-primary);
+                    border-radius: 50%;
+                    animation: spin 0.8s linear infinite;
+                }
+                @keyframes spin {
+                    from { transform: rotate(0deg); }
+                    to { transform: rotate(360deg); }
+                }
+                .btn-icon.loading {
+                    pointer-events: none;
+                    opacity: 0.7;
                 }
                 
                 /* Mobile optimization */

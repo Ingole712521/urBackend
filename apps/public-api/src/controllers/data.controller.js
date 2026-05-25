@@ -4,13 +4,13 @@ const { Project } = require("@urbackend/common");
 const { getConnection } = require("@urbackend/common");
 const { getCompiledModel } = require("@urbackend/common");
 const { QueryEngine } = require("@urbackend/common");
-const { validateData, validateUpdateData, aggregateSchema } = require("@urbackend/common");
+const { validateData, validateUpdateData, aggregateSchema, dispatchWebhooks } = require("@urbackend/common");
 const { performance } = require('perf_hooks');
-const { dispatchWebhooks } = require('../utils/webhookDispatcher');
 const { z } = require("zod");
 const { 
   AppError, 
-  enqueueCollectionCleanup 
+  enqueueCollectionCleanup,
+  syncCollectionCleanup
 } = require("@urbackend/common");
 
 const isDebug = process.env.DEBUG === 'true';
@@ -657,8 +657,15 @@ module.exports.recoverSingleDoc = async (req, res, next) => {
       project.resources.db.isExternal,
     );
 
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
     const result = await Model.findOneAndUpdate(
-      { _id: id, isDeleted: true, ...(req.rlsFilter || {}) },
+      { 
+        _id: id, 
+        isDeleted: true, 
+        deletedAt: { $gte: thirtyDaysAgo },
+        ...(req.rlsFilter || {}) 
+      },
       { 
         $set: { 
           isDeleted: false, 
@@ -669,16 +676,23 @@ module.exports.recoverSingleDoc = async (req, res, next) => {
     ).lean();
 
     if (!result) {
-      return next(new AppError(404, "Document not found or not in trash."));
+      return next(new AppError(404, "Document not found or recovery window expired (30 days)."));
     }
 
     dispatchWebhooks({
       projectId: project._id,
       collection: collectionName,
-      action: 'update',
+      action: 'recover',
       document: result,
       documentId: id,
+      options: {}
     });
+
+    try {
+      await syncCollectionCleanup(project._id, collectionName);
+    } catch (err) {
+      console.error("Failed to sync trash cleanup job after recovery", { projectId: String(project._id), collectionName, err });
+    }
 
     res.json({ success: true, data: result, message: "Document recovered from trash" });
   } catch (err) {

@@ -22,7 +22,7 @@ const { getConnection } = require("@urbackend/common");
 const { getCompiledModel } = require("@urbackend/common");
 const { QueryEngine } = require("@urbackend/common");
 const { storageRegistry } = require("@urbackend/common");
-const { AppError } = require("@urbackend/common");
+const { AppError, dispatchWebhooks, enqueueCollectionCleanup, syncCollectionCleanup } = require("@urbackend/common");
 const { resolveEffectivePlan } = require("@urbackend/common");
 const {
   deleteProjectByApiKeyCache,
@@ -37,7 +37,6 @@ const { getPublicIp } = require("@urbackend/common");
 const { clearCompiledModel } = require("@urbackend/common");
 const { createUniqueIndexes, ApiAnalytics, MailLog } = require("@urbackend/common");
 const { emitEvent } = require('../utils/emitEvent');
-const { enqueueCollectionCleanup } = require('@urbackend/common');
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const SAFETY_MAX_BYTES = 100 * 1024 * 1024;
 const CONFIRM_UPLOAD_SIZE_TOLERANCE_BYTES = 64;
@@ -1031,8 +1030,14 @@ module.exports.recoverRow = async (req, res, next) => {
       project.resources.db.isExternal,
     );
 
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
     const result = await Model.findOneAndUpdate(
-      { _id: id, isDeleted: true },
+      { 
+        _id: id, 
+        isDeleted: true,
+        deletedAt: { $gte: thirtyDaysAgo }
+      },
       { 
         $set: { 
           isDeleted: false, 
@@ -1043,7 +1048,22 @@ module.exports.recoverRow = async (req, res, next) => {
     ).lean();
 
     if (!result) {
-      return next(new AppError(404, "Document not found or not in trash."));
+      return next(new AppError(404, "Document not found or recovery window expired (30 days)."));
+    }
+
+    dispatchWebhooks({
+      projectId: project._id,
+      collection: collectionName,
+      action: "recover",
+      document: result,
+      documentId: id,
+      options: { bypassLimit: true }
+    });
+
+    try {
+      await syncCollectionCleanup(projectId, collectionName);
+    } catch (err) {
+      console.error("Failed to sync trash cleanup job after recovery", { projectId, collectionName, err });
     }
 
     res.json({ success: true, data: result, message: "Document recovered from trash" });

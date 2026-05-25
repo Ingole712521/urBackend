@@ -99,8 +99,14 @@ const DraggableColumnHeader = ({ header, children, style: propStyle, className }
     );
 };
 
-export default function CollectionTable({ data, activeCollection, onDelete, onView, onEdit, onRecover }) {
-    const [now] = useState(() => Date.now());
+export default function CollectionTable({ data, activeCollection, onDelete, onView, onEdit, onRecover, recoveringIds }) {
+    const [now, setNow] = useState(null);
+
+    useEffect(() => {
+        // Use setTimeout to avoid synchronous cascading render warning
+        const timer = setTimeout(() => setNow(Date.now()), 0);
+        return () => clearTimeout(timer);
+    }, []);
 
 
     // 1. Column Definitions
@@ -226,15 +232,20 @@ export default function CollectionTable({ data, activeCollection, onDelete, onVi
                                 <Eye size={15} />
                             </button>
                             {activeCollection?.name !== 'users' && (
-                                record.isDeleted ? (
+                                (record.isDeleted || recoveringIds.has(record._id)) ? (
                                     <button
-                                        className="btn-icon"
+                                        className={`btn-icon ${recoveringIds.has(record._id) ? 'loading' : ''}`}
                                         onClick={() => onRecover(record._id)}
                                         onPointerDown={e => e.stopPropagation()}
-                                        aria-label="Restore Record"
+                                        aria-label={`Restore record ${record._id}`}
+                                        disabled={recoveringIds.has(record._id)}
                                         title={getDeletionTooltip(record.deletedAt, now)}
                                     >
-                                        <RotateCcw size={15} color="var(--color-primary)" />
+                                        {recoveringIds.has(record._id) ? (
+                                            <div className="spinner-small"></div>
+                                        ) : (
+                                            <RotateCcw size={15} color="var(--color-primary)" />
+                                        )}
                                     </button>
                                 ) : (
                                     <>
@@ -264,7 +275,7 @@ export default function CollectionTable({ data, activeCollection, onDelete, onVi
                 },
             },
         ];
-    }, [activeCollection, data, onDelete, onView, onEdit, onRecover, now]);
+    }, [activeCollection, data, onDelete, onView, onEdit, onRecover, recoveringIds, now]);
 
     // 2. Load Persisted State
     const storageKey = `table-settings-${activeCollection?._id}`;
@@ -722,6 +733,22 @@ export default function CollectionTable({ data, activeCollection, onDelete, onVi
                  }
                 .column-toggle-item:hover {
                     background: rgba(255,255,255,0.05);
+                }
+                .spinner-small {
+                    width: 14px;
+                    height: 14px;
+                    border: 2px solid rgba(255, 255, 255, 0.1);
+                    border-top: 2px solid var(--color-primary);
+                    border-radius: 50%;
+                    animation: spin 0.8s linear infinite;
+                }
+                @keyframes spin {
+                    from { transform: rotate(0deg); }
+                    to { transform: rotate(360deg); }
+                }
+                .btn-icon.loading {
+                    pointer-events: none;
+                    opacity: 0.7;
                 }
                 .custom-scrollbar::-webkit-scrollbar {
                     width: 10px;

@@ -7,13 +7,17 @@ const mockModel = {
     findOneAndUpdate: mockFindOneAndUpdate,
 };
 
+const mockDispatchWebhooks = jest.fn();
+
 jest.mock('@urbackend/common', () => ({
     Project: {
         findOne: mockFindOne,
     },
     getConnection: jest.fn().mockResolvedValue({}),
     getCompiledModel: jest.fn(() => mockModel),
+    dispatchWebhooks: mockDispatchWebhooks,
     enqueueCollectionCleanup: jest.fn().mockResolvedValue(true),
+    syncCollectionCleanup: jest.fn().mockResolvedValue(true),
     AppError: class AppError extends Error {
         constructor(statusCode, message) {
             super(message);
@@ -140,7 +144,11 @@ describe('Soft Delete in dashboard project.controller', () => {
 
         expect(mockFindOne).toHaveBeenCalledWith({ _id: 'proj_1', owner: 'user_1' });
         expect(mockFindOneAndUpdate).toHaveBeenCalledWith(
-            { _id: '507f1f77bcf86cd799439011', isDeleted: true },
+            expect.objectContaining({ 
+                _id: '507f1f77bcf86cd799439011', 
+                isDeleted: true,
+                deletedAt: expect.objectContaining({ $gte: expect.any(Date) })
+            }),
             expect.objectContaining({
                 $set: { isDeleted: false, deletedAt: null }
             }),
@@ -152,6 +160,14 @@ describe('Soft Delete in dashboard project.controller', () => {
             data: restoredDoc, 
             message: "Document recovered from trash" 
         });
+
+        expect(mockDispatchWebhooks).toHaveBeenCalledWith(expect.objectContaining({
+            action: 'recover',
+            document: restoredDoc,
+            projectId: 'proj_1'
+        }));
+        const { syncCollectionCleanup } = require('@urbackend/common');
+        expect(syncCollectionCleanup).toHaveBeenCalledWith('proj_1', 'posts');
     });
 
     test('recoverRow returns 404 via next(AppError) if document is not in trash', async () => {
@@ -178,7 +194,7 @@ describe('Soft Delete in dashboard project.controller', () => {
 
         expect(next).toHaveBeenCalledWith(expect.objectContaining({
             statusCode: 404,
-            message: "Document not found or not in trash."
+            message: "Document not found or recovery window expired (30 days)."
         }));
     });
 

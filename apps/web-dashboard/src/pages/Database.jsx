@@ -43,6 +43,7 @@ export default function Database() {
       filters: []
   });
   const [totalRecords, setTotalRecords] = useState(0);
+  const [recoveringIds, setRecoveringIds] = useState(new Set());
   const [showFilterMenu, setShowFilterMenu] = useState(false);
   const [rlsEnabled, setRlsEnabled] = useState(false);
   const [rlsMode, setRlsMode] = useState("public-read");
@@ -165,18 +166,33 @@ export default function Database() {
    * @param {string} id - The ID of the record to recover.
    */
   const handleRecoverRecord = async (id) => {
+    const originalRecord = data.find(item => item._id === id);
+    if (!originalRecord) return;
+
+    setRecoveringIds(prev => new Set(prev).add(id));
+    
+    // Optimistic Update: clear isDeleted flag locally
+    setData(prev => prev.map(item => 
+      item._id === id ? { ...item, isDeleted: false, deletedAt: null } : item
+    ));
+
     try {
       await api.patch(`/api/projects/${projectId}/collections/${activeCollection.name}/data/${id}/recover`);
-      
-      // Inline update: set isDeleted to false and clear deletedAt
-      setData(prev => prev.map(item => 
-        item._id === id ? { ...item, isDeleted: false, deletedAt: null } : item
-      ));
-      
       toast.success("Document restored successfully");
     } catch (err) {
+      // Rollback to original state on failure
+      setData(prev => prev.map(item => 
+        item._id === id ? originalRecord : item
+      ));
+      
       const errMsg = err.response?.data?.message || err.response?.data?.error || err.message;
       toast.error(errMsg ? `Failed to restore document: ${errMsg}` : "Failed to restore document");
+    } finally {
+      setRecoveringIds(prev => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
     }
   };
 
@@ -300,6 +316,7 @@ export default function Database() {
                     activeCollection={activeCollection} 
                     onView={setSelectedRecord} 
                     onRecover={handleRecoverRecord}
+                    recoveringIds={recoveringIds}
                   />
                 ) : viewMode === "table" ? (
                   <CollectionTable 
@@ -309,6 +326,7 @@ export default function Database() {
                     onView={setSelectedRecord} 
                     onEdit={(rec) => { if (activeCollection?.name === 'users') return; setEditingRecord(rec); setIsAddModalOpen(true); }} 
                     onRecover={handleRecoverRecord}
+                    recoveringIds={recoveringIds}
                   />
                 ) : (
                   <div style={{ height: '100%', overflow: 'auto', padding: '1.5rem', background: '#050505', color: 'var(--color-primary)', fontFamily: 'monospace', fontSize: '0.8rem' }}>

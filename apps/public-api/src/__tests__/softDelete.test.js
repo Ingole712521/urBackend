@@ -22,6 +22,7 @@ jest.mock('@urbackend/common', () => ({
     validateUpdateData: jest.fn(),
     isValidId: (id) => mongoose.Types.ObjectId.isValid(id),
     enqueueCollectionCleanup: jest.fn().mockResolvedValue(true),
+    syncCollectionCleanup: jest.fn().mockResolvedValue(true),
     AppError: class AppError extends Error {
         constructor(statusCode, message) {
             super(message);
@@ -117,7 +118,11 @@ describe('Soft Delete in data.controller', () => {
         await recoverSingleDoc(req, res);
 
         expect(mockFindOneAndUpdate).toHaveBeenCalledWith(
-            expect.objectContaining({ _id: '507f1f77bcf86cd799439011', isDeleted: true }),
+            expect.objectContaining({ 
+                _id: '507f1f77bcf86cd799439011', 
+                isDeleted: true,
+                deletedAt: expect.objectContaining({ $gte: expect.any(Date) })
+            }),
             expect.objectContaining({
                 $set: { isDeleted: false, deletedAt: null }
             }),
@@ -129,6 +134,14 @@ describe('Soft Delete in data.controller', () => {
             data: restoredDoc, 
             message: "Document recovered from trash" 
         });
+
+        const { dispatchWebhooks, syncCollectionCleanup } = require('@urbackend/common');
+        expect(dispatchWebhooks).toHaveBeenCalledWith(expect.objectContaining({
+            action: 'recover',
+            document: restoredDoc,
+            projectId: 'proj_1'
+        }));
+        expect(syncCollectionCleanup).toHaveBeenCalledWith('proj_1', 'posts');
     });
 
     test('recoverSingleDoc returns 404 if document is not in trash', async () => {
@@ -144,7 +157,7 @@ describe('Soft Delete in data.controller', () => {
 
         expect(next).toHaveBeenCalledWith(expect.objectContaining({
             statusCode: 404,
-            message: "Document not found or not in trash."
+            message: "Document not found or recovery window expired (30 days)."
         }));
     });
 
