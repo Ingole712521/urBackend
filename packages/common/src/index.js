@@ -51,6 +51,7 @@ const {
 const {
   trashCleanupQueue,
   enqueueCollectionCleanup,
+  syncCollectionCleanup,
   initTrashCleanupWorker,
 } = require("./queues/trashCleanupQueue");
 
@@ -113,6 +114,8 @@ const sessionManager = require("./utils/session.manager");
 const planLimits = require("./utils/planLimits");
 const AppError = require("./utils/AppError");
 const { checkLockout, recordFailedAttempt, clearLockout } = require("./utils/loginLockout");
+const { dispatchWebhooks } = require("./utils/webhookDispatcher");
+const { getDayKey, getMonthKey, getEndOfMonthTtlSeconds, incrWithTtlAtomic } = require("./utils/usageCounter");
 
 module.exports = {
   connectDB,
@@ -212,5 +215,11 @@ module.exports = {
   clearLockout,
   trashCleanupQueue,
   enqueueCollectionCleanup,
+  syncCollectionCleanup,
   initTrashCleanupWorker,
+  dispatchWebhooks,
+  getDayKey,
+  getMonthKey,
+  getEndOfMonthTtlSeconds,
+  incrWithTtlAtomic,
 };

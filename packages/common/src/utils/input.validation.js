@@ -515,6 +515,7 @@ const webhookEventConfigSchema = z.object({
   insert: z.boolean().optional(),
   update: z.boolean().optional(),
   delete: z.boolean().optional(),
+  recover: z.boolean().optional(),
 });
 
 // URL validation: HTTPS required (or http://localhost for dev)
