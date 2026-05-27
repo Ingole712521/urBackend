@@ -36,9 +36,8 @@ Returns a list of documents from the specified collection. Supports pagination, 
   first, `sort=title` for ascending alphabetical).
 </ParamField>
 
-<ParamField query="filter[field][op]" type="string">
-  Filter documents by field value. Replace `field` with the document field name and `op` with
-  a comparison operator. Example: `filter[status][eq]=published&filter[views][gt]=100`
+<ParamField query="field_op" type="string">
+  Filter documents by field value. Append an operator suffix to the field name for comparisons (e.g., `_gt`, `_lt`, `_ne`, `_in`, `_regex`). For exact matches, use the field name without a suffix. Example: `status=published&views_gt=100`
 </ParamField>
 
 <ParamField query="include_deleted" type="boolean">
@@ -95,7 +94,7 @@ const params = new URLSearchParams({
   page: '1',
   limit: '10',
   sort: '-createdAt',
-  'filter[status][eq]': 'published',
+  status: 'published',
   include_deleted: 'true'
 });
 
@@ -114,7 +113,7 @@ const { data } = await res.json();
 ```
 
 ```bash curl
-curl "https://api.ub.bitbros.in/api/data/posts?page=1&limit=10&sort=-createdAt&filter[status][eq]=published&include_deleted=true" \
+curl "https://api.ub.bitbros.in/api/data/posts?page=1&limit=10&sort=-createdAt&status=published&include_deleted=true" \
   -H "x-api-key: pk_live_YOUR_KEY"
 ```
 
