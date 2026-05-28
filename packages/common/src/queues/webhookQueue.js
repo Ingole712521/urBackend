@@ -91,13 +91,18 @@ function initWebhookWorker() {
         if (event.includes("deleted")) action = "delete";
         if (event.includes("recovered")) action = "recover";
 
-        await dispatchWebhooks({
-          projectId,
-          collection,
-          action,
-          document: payload,
-          documentId: payload?._id,
-        });
+        try {
+          await dispatchWebhooks({
+            projectId,
+            collection,
+            action,
+            document: payload,
+            documentId: payload?._id,
+          });
+        } catch (error) {
+          console.error(`[Webhook] trigger-webhook failed for projectId: ${projectId}, collection: ${collection}, action: ${action}, documentId: ${payload?._id}`, error);
+          throw error;
+        }
         return;
       }
 

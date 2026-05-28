@@ -166,7 +166,8 @@ describe('Soft Delete in dashboard project.controller', () => {
             expect.objectContaining({
                 event: 'document.recovered',
                 payload: restoredDoc,
-                projectId: 'proj_1'
+                projectId: 'proj_1',
+                collection: 'posts'
             }),
             { removeOnComplete: true }
         );
