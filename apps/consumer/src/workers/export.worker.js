@@ -21,15 +21,18 @@ const {
 
 const initExportWorker = () => {
     const worker = new Worker(exportQueue.name, async (job) => {
-        const { projectId, userId, email } = job.data;
-        console.log(`[ExportWorker] Starting export for project ${projectId} requested by ${email}`);
+        const { projectId, collectionName, userId, email } = job.data;
+        console.log(`[ExportWorker] Starting export for collection ${collectionName} in project ${projectId} requested by ${email}`);
 
         const project = await Project.findById(projectId);
         if (!project) throw new Error('Project not found');
+        
+        const col = project.collections.find(c => c.name === collectionName);
+        if (!col) throw new Error(`Collection ${collectionName} not found`);
 
         const connection = await getConnection(projectId);
         const bucket = getBucket(project);
-        const storagePath = `${projectId}/exports/db_export_${Date.now()}.json`;
+        const storagePath = `${projectId}/exports/${collectionName}_export_${Date.now()}.json`;
 
         let provider = 'supabase';
         if (project.resources?.storage?.isExternal) {
@@ -47,30 +50,26 @@ const initExportWorker = () => {
         console.log(`[ExportWorker] Preparing upload to storage (Provider: ${provider})...`);
 
         if (provider === 'supabase') {
-            const tempFilePath = path.join(os.tmpdir(), `export_${projectId}_${Date.now()}.json`);
+            const tempFilePath = path.join(os.tmpdir(), `export_${projectId}_${collectionName}_${Date.now()}.json`);
             const writeStream = fs.createWriteStream(tempFilePath);
             
             try {
                 writeStream.write('{\n');
-                for (let i = 0; i < project.collections.length; i++) {
-                    const col = project.collections[i];
-                    const Model = getCompiledModel(connection, col, projectId, project.resources.db.isExternal);
-                    
-                    writeStream.write(`  "${col.name}": [\n`);
-                    
-                    const cursor = Model.find().lean().cursor();
-                    let first = true;
-                    
-                    for await (const doc of cursor) {
-                        if (!first) writeStream.write(',\n');
-                        writeStream.write(`    ${JSON.stringify(doc)}`);
-                        first = false;
-                    }
-                    
-                    writeStream.write('\n  ]');
-                    if (i < project.collections.length - 1) writeStream.write(',\n');
+                const Model = getCompiledModel(connection, col, projectId, project.resources.db.isExternal);
+                
+                writeStream.write(`  "${col.name}": [\n`);
+                
+                const cursor = Model.find().lean().cursor();
+                let first = true;
+                
+                for await (const doc of cursor) {
+                    if (!first) writeStream.write(',\n');
+                    writeStream.write(`    ${JSON.stringify(doc)}`);
+                    first = false;
                 }
-                writeStream.write('\n}\n');
+                
+                writeStream.write('\n  ]\n');
+                writeStream.write('}\n');
                 writeStream.end();
 
                 await new Promise((resolve, reject) => {
@@ -103,26 +102,22 @@ const initExportWorker = () => {
             try {
                 passThrough.write('{\n');
                 
-                for (let i = 0; i < project.collections.length; i++) {
-                    const col = project.collections[i];
-                    const Model = getCompiledModel(connection, col, projectId, project.resources.db.isExternal);
-                    
-                    passThrough.write(`  "${col.name}": [\n`);
-                    
-                    const cursor = Model.find().lean().cursor();
-                    let first = true;
-                    
-                    for await (const doc of cursor) {
-                        if (!first) passThrough.write(',\n');
-                        passThrough.write(`    ${JSON.stringify(doc)}`);
-                        first = false;
-                    }
-                    
-                    passThrough.write('\n  ]');
-                    if (i < project.collections.length - 1) passThrough.write(',\n');
+                const Model = getCompiledModel(connection, col, projectId, project.resources.db.isExternal);
+                
+                passThrough.write(`  "${col.name}": [\n`);
+                
+                const cursor = Model.find().lean().cursor();
+                let first = true;
+                
+                for await (const doc of cursor) {
+                    if (!first) passThrough.write(',\n');
+                    passThrough.write(`    ${JSON.stringify(doc)}`);
+                    first = false;
                 }
                 
-                passThrough.write('\n}\n');
+                passThrough.write('\n  ]\n');
+                
+                passThrough.write('}\n');
                 passThrough.end();
 
                 console.log(`[ExportWorker] Database stream ended. Awaiting final storage upload...`);
