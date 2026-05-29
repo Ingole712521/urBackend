@@ -107,10 +107,11 @@ const DatabaseHeader = ({
 
         
         {activeCollection?.name !== 'users' && (
-+          <button onClick={onExport} disabled={isExporting} className="btn btn-secondary" style={{ padding: '6px 12px', height: '32px', gap: '6px', fontSize: '0.75rem' }}>
-+            <Download size={14} /> Export
-+          </button>
-+        )}
+          <button onClick={onExport} disabled={isExporting} className="btn btn-secondary" style={{ padding: '6px 12px', height: '32px', gap: '6px', fontSize: '0.75rem' }}>
+            <Download size={14} /> Export
+          </button>
+      
+        )}
 
         
 
