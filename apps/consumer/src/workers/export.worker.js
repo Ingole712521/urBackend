@@ -24,7 +24,9 @@ const initExportWorker = () => {
         const { projectId, collectionName, userId, email } = job.data;
         console.log(`[ExportWorker] Starting export for collection ${collectionName} in project ${projectId} requested by ${email}`);
 
-        const project = await Project.findById(projectId);
+        const project = await Project.findById(projectId).select(
+            "+resources.storage.config.encrypted +resources.storage.config.iv +resources.storage.config.tag resources.storage.isExternal"
+        );
         if (!project) throw new Error('Project not found');
         
         const col = project.collections.find(c => c.name === collectionName);
