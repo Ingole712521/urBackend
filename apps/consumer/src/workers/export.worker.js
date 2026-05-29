@@ -25,7 +25,7 @@ const initExportWorker = () => {
         console.log(`[ExportWorker] Starting export for collection ${collectionName} in project ${projectId} requested by ${email}`);
 
         const project = await Project.findById(projectId).select(
-            "+resources.storage.config.encrypted +resources.storage.config.iv +resources.storage.config.tag resources.storage.isExternal"
+            "name collections resources.db.isExternal resources.storage.isExternal +resources.storage.config.encrypted +resources.storage.config.iv +resources.storage.config.tag"
         );
         if (!project) throw new Error('Project not found');
         
