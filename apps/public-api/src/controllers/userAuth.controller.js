@@ -1689,7 +1689,7 @@ module.exports.refreshToken = async (req, res) => {
 
         const user = await Model.findOne(
             { _id: new mongoose.Types.ObjectId(session.userId) },
-            { _id: 1, isDeleted: 1 }
+            { _id: 1, isDeleted: 1, deletedAt: 1 }
         ).lean();
         if (!user) {
             await revokeSessionChain(session.tokenId);
