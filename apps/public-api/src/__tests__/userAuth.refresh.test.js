@@ -213,6 +213,36 @@ describe('public userAuth refresh flow', () => {
         );
     });
 
+    test('refresh-token returns 403 when user is soft-deleted', async () => {
+        const incoming = 'token_2.secret_2';
+        const session = {
+            tokenId: 'token_2',
+            projectId: 'project_1',
+            userId: 'user_1',
+            tokenHash: hashToken(incoming),
+            isUsed: false,
+            revokedAt: null,
+            expiresAt: new Date(Date.now() + 60_000).toISOString(),
+        };
+
+        getRefreshSession.mockResolvedValueOnce(session);
+        Project.__chain.lean.mockResolvedValueOnce(makeProject());
+        mockModel.findOne.mockReturnValueOnce({
+            lean: jest.fn().mockResolvedValue({ _id: 'user_1', isDeleted: true, deletedAt: new Date().toISOString() }),
+        });
+
+        const req = makeReq({
+            headers: { 'x-refresh-token': incoming },
+        });
+        const res = makeRes();
+
+        await controller.refreshToken(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(403);
+        expect(res.json).toHaveBeenCalledWith({ success: false, data: {}, message: expect.stringContaining('deletion') });
+        expect(res.clearCookie).toHaveBeenCalledWith('refreshToken', expect.any(Object));
+    });
+
     test('logout revokes current refresh session when provided', async () => {
         const rawToken = 'token_2.secret_2';
         const session = {

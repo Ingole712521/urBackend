@@ -23,6 +23,16 @@ const {
     shouldExposeRefreshToken
 } = require('../utils/refreshToken');
 
+const checkUserSoftDeleted = (user) => {
+    if (user && user.isDeleted) {
+        const dateStr = user.deletedAt 
+            ? new Date(new Date(user.deletedAt).getTime() + 30 * 24 * 60 * 60 * 1000).toDateString()
+            : 'soon';
+        return `Your account is scheduled for deletion on ${dateStr}. Please contact the administrator to recover it.`;
+    }
+    return null;
+};
+
 const SOCIAL_PROVIDER_KEYS = ['github', 'google'];
 const SOCIAL_STATE_TTL_SECONDS = 600;
 const SOCIAL_REFRESH_EXCHANGE_TTL_SECONDS = 60;
@@ -514,6 +524,12 @@ const findOrCreateSocialUser = async ({ project, usersColConfig, Model, provider
 
     let user = await Model.findOne({ [providerIdField]: profile.providerUserId });
     if (user) {
+        const deletedMsg = checkUserSoftDeleted(user);
+        if (deletedMsg) {
+            const err = new Error(deletedMsg);
+            err.statusCode = 403;
+            throw err;
+        }
         return { user, isNewUser: false, linkedByEmail: false };
     }
 
@@ -525,6 +541,12 @@ const findOrCreateSocialUser = async ({ project, usersColConfig, Model, provider
 
     user = await Model.findOne({ email: profile.email });
     if (user) {
+        const deletedMsg = checkUserSoftDeleted(user);
+        if (deletedMsg) {
+            const err = new Error(deletedMsg);
+            err.statusCode = 403;
+            throw err;
+        }
         // P1: Only link if provider email is verified; reject if unverified to prevent account takeover
         if (!profile.emailVerified) {
             const err = new Error(`Cannot link ${providerName} account: the provider email is not verified. Please verify your email with ${providerName} first.`);
@@ -886,15 +908,17 @@ module.exports.exchangeSocialRefreshToken = async (req, res) => {
         if (!rtCode || !token) {
             return res.status(400).json({
                 success: false,
+                data: {},
                 message: 'rtCode and token are required',
             });
         }
 
         const exchangeKey = getSocialRefreshExchangeKey(rtCode);
-        const rawExchange = await redis.get(exchangeKey);
+        const rawExchange = await redis.getdel(exchangeKey);
         if (!rawExchange) {
             return res.status(400).json({
                 success: false,
+                data: {},
                 message: 'Invalid or expired refresh token exchange code',
             });
         }
@@ -903,22 +927,21 @@ module.exports.exchangeSocialRefreshToken = async (req, res) => {
         try {
             parsedExchange = JSON.parse(rawExchange);
         } catch (err) {
-            await redis.del(exchangeKey);
             return res.status(400).json({
                 success: false,
+                data: {},
                 message: 'Invalid or expired refresh token exchange code',
             });
         }
 
         if (parsedExchange.token !== token || !parsedExchange.refreshToken) {
-            await redis.del(exchangeKey);
             return res.status(403).json({
                 success: false,
+                data: {},
                 message: 'Invalid refresh token exchange payload',
             });
         }
 
-        await redis.del(exchangeKey);
         return res.status(200).json({
             success: true,
             data: {
@@ -929,7 +952,8 @@ module.exports.exchangeSocialRefreshToken = async (req, res) => {
     } catch (err) {
         return res.status(500).json({
             success: false,
-            message: err.message || 'Failed to exchange refresh token',
+            data: {},
+            message: 'Internal server error',
         });
     }
 };
@@ -957,6 +981,9 @@ module.exports.signup = async (req, res) => {
         const existingUser = await Model.findOne({ email: normalizedEmail });
 
         if (existingUser) {
+            const deletedMsg = checkUserSoftDeleted(existingUser);
+            if (deletedMsg) return res.status(403).json({ success: false, data: {}, message: deletedMsg });
+
             // Check if user is unverified. If so, we can trigger a resend instead of a hard error.
             const verificationField = getVerificationField(usersColConfig);
             const isVerified = verificationField ? !!existingUser[verificationField] : true;
@@ -1092,6 +1119,10 @@ module.exports.login = async (req, res, next) => {
 
         const user = await Model.findOne({ email: normalizedEmail }).select('+password');
 
+        if (user && user.isDeleted) {
+            return sendAuthError(403, checkUserSoftDeleted(user));
+        }
+
         if (!user) {
             let failedStatus = { locked: false, retryAfterSeconds: 0, attempts: 0 };
             try {
@@ -1178,6 +1209,9 @@ module.exports.me = async (req, res) => {
 
             if (!user) return res.status(404).json({ error: "User not found" });
 
+            const deletedMsg = checkUserSoftDeleted(user);
+            if (deletedMsg) return res.status(403).json({ success: false, data: {}, message: deletedMsg });
+
             res.json(user);
 
         } catch (err) {
@@ -1206,6 +1240,9 @@ module.exports.publicProfile = async (req, res) => {
 
         const user = await Model.findOne({ username }, { password: 0 }).lean();
         if (!user) return res.status(404).json({ error: "User not found" });
+
+        const deletedMsg = checkUserSoftDeleted(user);
+        if (deletedMsg) return res.status(403).json({ success: false, data: {}, message: deletedMsg });
 
         const profile = sanitizePublicProfile(user, usersColConfig);
         return res.json(profile);
@@ -1409,7 +1446,8 @@ module.exports.requestPasswordReset = async (req, res) => {
         }
 
         const user = await Model.findOne({ email: normalizedEmail });
-        if (!user) {
+        
+        if (!user || (user && user.isDeleted)) {
             await setPublicOtpCooldown(project._id, normalizedEmail, 'reset');
             return res.json({ message: "If that email exists, a reset code has been sent." });
         }
@@ -1447,12 +1485,16 @@ module.exports.resetPasswordUser = async (req, res) => {
         const { Model: collection } = await getUsersModel(project);
         if (!collection) return res.status(404).json({ error: "Auth collection not found" });
 
-        const result = await collection.updateOne(
+        const user = await collection.findOne({ email: normalizedEmail });
+        if (!user) return res.status(404).json({ error: "User not found" });
+
+        const deletedMsg = checkUserSoftDeleted(user);
+        if (deletedMsg) return res.status(403).json({ success: false, data: {}, message: deletedMsg });
+
+        await collection.updateOne(
             { email: normalizedEmail },
             { $set: { password: hashedPassword } }
         );
-
-        if (result.matchedCount === 0) return res.status(404).json({ error: "User not found" });
 
         try {
             // Fail-open: if Redis is unavailable, do not block password recovery success.
@@ -1506,7 +1548,13 @@ module.exports.updateProfile = async (req, res) => {
         const connection = await getConnection(project._id);
         const Model = getCompiledModel(connection, usersColConfig, project._id, project.resources.db.isExternal);
 
-        const result = await Model.updateOne(
+        const user = await Model.findOne({ _id: new mongoose.Types.ObjectId(decoded.userId) });
+        if (!user) return res.status(404).json({ error: "User not found" });
+
+        const deletedMsg = checkUserSoftDeleted(user);
+        if (deletedMsg) return res.status(403).json({ success: false, data: {}, message: deletedMsg });
+
+        await Model.updateOne(
             { _id: new mongoose.Types.ObjectId(decoded.userId) },
             { $set: sanitizedUpdateData },
             { runValidators: true }
@@ -1545,6 +1593,9 @@ module.exports.changePasswordUser = async (req, res) => {
 
         const user = await Model.findOne({ _id: new mongoose.Types.ObjectId(decoded.userId) });
         if (!user) return res.status(404).json({ error: "User not found" });
+
+        const deletedMsg = checkUserSoftDeleted(user);
+        if (deletedMsg) return res.status(403).json({ success: false, data: {}, message: deletedMsg });
 
         const validPass = await bcrypt.compare(currentPassword, user.password);
         if (!validPass) return res.status(400).json({ error: "Invalid current password" });
@@ -1638,12 +1689,19 @@ module.exports.refreshToken = async (req, res) => {
 
         const user = await Model.findOne(
             { _id: new mongoose.Types.ObjectId(session.userId) },
-            { _id: 1 }
+            { _id: 1, isDeleted: 1, deletedAt: 1 }
         ).lean();
         if (!user) {
             await revokeSessionChain(session.tokenId);
             clearRefreshCookie(res);
-            return res.status(401).json({ error: 'User not found for refresh token' });
+            return res.status(401).json({ success: false, data: {}, message: 'User not found for refresh token' });
+        }
+
+        const deletedMsg = checkUserSoftDeleted(user);
+        if (deletedMsg) {
+            await revokeSessionChain(session.tokenId);
+            clearRefreshCookie(res);
+            return res.status(403).json({ success: false, data: {}, message: deletedMsg });
         }
 
         const newTokens = await issueAuthTokens({
