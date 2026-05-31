@@ -144,12 +144,6 @@ const getDefaultRlsForCollection = (collectionName, schema = []) => {
 
 const SOCIAL_PROVIDER_KEYS = ["github", "google"];
 
-/**
- * Sanitizes authProviders from a project document for safe API responses.
- * Strips clientSecret fields and replaces them with a boolean hasClientSecret flag.
- * @param {Object} authProviders - Raw authProviders from the project document
- * @returns {Object} Sanitized providers keyed by provider name
- */
 const sanitizeAuthProviders = (authProviders = {}) => {
   return SOCIAL_PROVIDER_KEYS.reduce((acc, provider) => {
     const config = authProviders?.[provider] || {};
@@ -336,13 +330,11 @@ module.exports.getAllProject = async (req, res) => {
       .select("name description databaseUsed databaseLimit storageUsed storageLimit updatedAt isAuthEnabled collections")
       .lean();
 
-    // --- HEALTH CALCULATION (SIMULATED / CALCULATED) ---
-    // Fetch recent log status for all projects to determine health
     const projectIds = projects.map(p => p._id);
     const recentLogs = await Log.aggregate([
       { $match: { projectId: { $in: projectIds } } },
       { $sort: { timestamp: -1 } },
-      { $limit: 100 }, // Get the last 100 logs globally for user to keep it fast
+      { $limit: 100 },
       { $group: {
           _id: "$projectId",
           errorCount: { $sum: { $cond: [{ $gte: ["$status", 400] }, 1, 0] } },
@@ -360,7 +352,6 @@ module.exports.getAllProject = async (req, res) => {
       const stats = logsMap[project._id.toString()];
       let health = 'healthy';
       
-      // Determine health: If > 20% recent errors, mark as warning
       if (stats) {
         const total = stats.errorCount + stats.successCount;
         const errorRate = stats.errorCount / total;
@@ -410,7 +401,6 @@ module.exports.getSingleProject = async (req, res) => {
       await setProjectById(req.params.projectId, projectObj);
     }
 
-    // Ownership Check (Even for Cache)
     if (projectObj.owner.toString() !== req.user._id.toString()) {
       return res.status(403).json({ error: "Access denied." });
     }
@@ -423,7 +413,7 @@ module.exports.getSingleProject = async (req, res) => {
 
 module.exports.regenerateApiKey = async (req, res) => {
   try {
-    const { keyType } = req.body; // 'publishable' or 'secret'
+    const { keyType } = req.body;
 
     if (keyType !== "publishable" && keyType !== "secret") {
       return res
@@ -442,7 +432,6 @@ module.exports.regenerateApiKey = async (req, res) => {
     if (!oldApiProj)
       return res.status(404).json({ error: "Project not found." });
 
-    // CLEAR CACHE
     await deleteProjectByApiKeyCache(oldApiProj.publishableKey);
     await deleteProjectByApiKeyCache(oldApiProj.secretKey);
 
@@ -481,7 +470,7 @@ const dropCollectionIfExists = async (connection, collectionName) => {
     }
   }
 };
-// VALIDATE URI
+
 const isSafeUri = (uri) => {
   try {
     const parsed = new URL(uri);
@@ -497,13 +486,11 @@ module.exports.updateExternalConfig = async (req, res) => {
   try {
     const { projectId } = req.params;
 
-    // POST FOR - EXTERNAL CONFIG
     const validatedData = updateExternalConfigSchema.parse(req.body);
     const { dbUri, storageUrl, storageKey, storageProvider } = validatedData;
 
     const updateData = {};
 
-    // DB CONFIG
     if (dbUri) {
       if (!isSafeUri(dbUri))
         return res.status(400).json({
@@ -514,7 +501,6 @@ module.exports.updateExternalConfig = async (req, res) => {
       updateData["resources.db.config"] = encrypt(JSON.stringify({ dbUri }));
       updateData["resources.db.isExternal"] = true;
 
-      // --- VERIFY CONNECTION ---
       console.log("Verifying connection to:", projectId);
       try {
         const tempConn = mongoose.createConnection(dbUri, {
@@ -538,10 +524,8 @@ module.exports.updateExternalConfig = async (req, res) => {
 
         return res.status(400).json({ error: errorMsg });
       }
-      // -------------------------
     }
 
-    // STORAGE CONFIG
     if (storageUrl && storageKey) {
       const storageConfig = {
         storageUrl,
@@ -641,7 +625,6 @@ module.exports.deleteExternalStorageConfig = async (req, res) => {
   }
 };
 
-// POST REQ FOR CREATE COLLECTION
 module.exports.createCollection = async (req, res) => {
   const executeOperation = async (session) => {
     const { projectId, collectionName, schema } = createCollectionSchema.parse(req.body);
@@ -775,7 +758,7 @@ module.exports.createCollection = async (req, res) => {
   }
 };
 
-// GET DOC BY ID
+// GET DOC BY ID — FIXED: added limitFields(), populate(), cursor pagination, count support, structured response
 module.exports.getData = async (req, res) => {
     try {
         const { projectId, collectionName } = req.params;
@@ -791,27 +774,85 @@ module.exports.getData = async (req, res) => {
         }
 
         const connection = await getConnection(projectId);
-        const model = getCompiledModel(connection, collectionConfig, projectId, project.resources.db.isExternal);
+        const model = getCompiledModel(
+            connection,
+            collectionConfig,
+            projectId,
+            project.resources.db.isExternal,
+        );
 
-        // const collectionsList = await mongoose.connection.db.listCollections({ name: finalCollectionName }).toArray();
+        const baseQuery = model.find();
 
-        const query = model.find();
+        // Strip password from users collection
         if (collectionName === 'users') {
-            query.select('-password');
+            baseQuery.select('-password');
         }
 
-        const features = new QueryEngine(query, req.query)
+        // Handle ?count=true — return document count only
+        if (req.query.count === 'true') {
+            const countEngine = new QueryEngine(model.find(), req.query);
+            const count = await countEngine.filter().query.countDocuments();
+            return res.status(200).json({
+                success: true,
+                data: { count },
+                message: "Count fetched successfully.",
+            });
+        }
+
+        const features = new QueryEngine(baseQuery, req.query)
             .filter()
             .sort()
-            .paginate();
+            .limitFields()   // fixes: ?fields= and ?meta=false now work
+            .populate();     // fixes: ?populate= and ?expand= now work
+
+        // Get total before paginating
+        const total = await features.count();
+
+        // Cursor-based pagination if ?cursor= is provided, otherwise offset-based
+        const useCursor = !!req.query.cursor;
+        if (useCursor) {
+            features.cursorPaginate();
+        } else {
+            features.paginate();
+        }
 
         const data = await features.query.lean();
 
-        res.json(data);
+        // Cursor: slice to limit and generate next cursor token
+        let items = data;
+        let nextCursor = null;
+        if (useCursor) {
+            const limit = Math.min(parseInt(req.query.limit, 10) || 100, 100);
+            features.generateNextCursor(data, limit);
+            items = data.slice(0, limit);
+            nextCursor = features.nextCursor;
+        }
+
+        const responseMeta = useCursor
+            ? {
+                total,
+                cursor: req.query.cursor || null,
+                nextCursor,
+                limit: Math.max(1, Math.min(parseInt(req.query.limit, 10) || 100, 100)),
+              }
+            : {
+                total,
+                page: parseInt(req.query.page, 10) || 1,
+                limit: Math.max(1, Math.min(parseInt(req.query.limit, 10) || 100, 100)),
+              };
+
+        res.json({
+            success: true,
+            data: {
+                items,
+                ...responseMeta,
+            },
+            message: "Data fetched successfully.",
+        });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
-}
+};
 
 module.exports.deleteCollection = async (req, res) => {
   try {
@@ -1105,7 +1146,6 @@ module.exports.editRow = async (req, res) => {
 
     if (collectionName === "users") {
       delete req.body.password;
-      // Also ensure it's not and nested or sneaky
       Object.keys(req.body).forEach((key) => {
         if (key.toLowerCase().includes("password")) delete req.body[key];
       });
@@ -1341,7 +1381,6 @@ module.exports.requestUpload = async (req, res, next) => {
 
     const external = isProjectStorageExternal(project);
 
-    // Pre-check quota only; actual storage usage is charged after confirmUpload verifies object existence and size.
     if (!external) {
       const storageLimit =
         typeof project.storageLimit === "number"
@@ -1401,12 +1440,10 @@ module.exports.confirmUpload = async (req, res, next) => {
     const external = isProjectStorageExternal(project);
     const normalizedPath = normalizeProjectPath(projectId, sanitizedFilePath);
 
-    // make sure client isn't confirming someone else's file
     if (!normalizedPath) {
       return next(new AppError(403, "Access denied."));
     }
 
-    // verify file actually exists on cloud before touching quota
     let actualSize;
     try {
       actualSize = await verifyUploadedFile(project, normalizedPath);
@@ -1435,7 +1472,6 @@ module.exports.confirmUpload = async (req, res, next) => {
       );
     }
 
-    // now it's safe to charge quota
     if (!external) {
       const result = await Project.updateOne(
         {
@@ -1550,7 +1586,6 @@ module.exports.updateProject = async (req, res) => {
           .json({ error: "resendApiKey must be a non-empty string." });
       }
       
-      // Sanitize the key: Prevent CRLF (HTTP Header Injection) and invalid characters
       if (!/^re_[A-Za-z0-9_]+$/.test(trimmedKey)) {
         return res.status(400).json({ error: "Invalid Resend API Key format." });
       }
@@ -1599,7 +1634,6 @@ module.exports.listMailTemplates = async (req, res, next) => {
   try {
     const { projectId } = req.params;
 
-    // Load as document so we can migrate legacy embedded templates if present
     const project = await Project.findOne({ _id: projectId, owner: req.user._id }).select("+mailTemplates");
 
     if (!project) return res.status(404).json({ success: false, data: {}, message: "Project not found." });
@@ -1683,7 +1717,6 @@ module.exports.listMailTemplates = async (req, res, next) => {
         }
 
         if (migrationSafeToFinalize) {
-          // Clear legacy embedded templates only after migration writes are complete.
           project.mailTemplates = [];
           await project.save();
           await deleteProjectById(project._id.toString()).catch(() => {});
@@ -1719,7 +1752,6 @@ module.exports.listGlobalMailTemplates = async (req, res, next) => {
   try {
     const { projectId } = req.params;
 
-    // Keep auth consistent: only show to project owners
     const project = await Project.findOne({ _id: projectId, owner: req.user._id })
       .select("_id")
       .lean();
@@ -1771,7 +1803,6 @@ module.exports.getMailTemplate = async (req, res, next) => {
       .select("_id key name subject html text updatedAt projectId isSystem")
       .lean();
 
-    // Legacy fallback (should be rare after listMailTemplates migration)
     if (!template) {
       const legacy = Array.isArray(project.mailTemplates) ? project.mailTemplates : [];
       const lt = legacy.find((x) => String(x._id) === String(templateId));
@@ -2055,7 +2086,6 @@ module.exports.deleteProject = async (req, res) => {
         .json({ error: "Project not found or access denied." });
     }
 
-    // DROP COLLECTIONS: Only for internal databases
     if (!project.resources.db.isExternal) {
       for (const col of project.collections) {
         const collectionName = `${project._id}_${col.name}`;
@@ -2069,7 +2099,6 @@ module.exports.deleteProject = async (req, res) => {
       } catch (e) {}
     }
 
-    // DELETE: Only for internal Infraa
     if (!isProjectStorageExternal(project)) {
       const supabase = await getStorage(project);
       const bucket = getBucket(project);
@@ -2105,7 +2134,6 @@ module.exports.deleteProject = async (req, res) => {
   }
 };
 
-// ENRICHED analytics function for the premium dashboard
 module.exports.analytics = async (req, res, next) => {
   try {
     const { projectId } = req.params;
@@ -2137,7 +2165,7 @@ module.exports.analytics = async (req, res, next) => {
       case 'last1h': 
         startDate.setHours(startDate.getHours() - 1); 
         format = "%H:%M";
-        groupStep = "minute"; // We'll group by minute for 1h
+        groupStep = "minute";
         break;
       case 'last24h': 
         startDate.setDate(startDate.getDate() - 1); 
@@ -2160,7 +2188,6 @@ module.exports.analytics = async (req, res, next) => {
       timestamp: { $gte: startDate },
     };
 
-    // 1. Aggregation for Time Series (Requests & Latency)
     const timeSeriesData = await ApiAnalytics.aggregate([
       { $match: match },
       {
@@ -2174,7 +2201,6 @@ module.exports.analytics = async (req, res, next) => {
       { $sort: { _id: 1 } }
     ]);
 
-    // 2. Aggregation for Breakdowns (Status, Method, Top Endpoints)
     const [breakdownStats, topEndpoints] = await Promise.all([
       ApiAnalytics.aggregate([
         { $match: match },
@@ -2217,7 +2243,6 @@ module.exports.analytics = async (req, res, next) => {
     const stats = breakdownStats[0].global[0] || { avgResponseTimeMs: 0, totalRequests: 0, errors: 0 };
     const errorRate = stats.totalRequests > 0 ? (stats.errors / stats.totalRequests) * 100 : 0;
 
-    // 3. Approximate p95
     let p95 = 0;
     if (stats.totalRequests > 0) {
       const p95Results = await ApiAnalytics.find(match)
@@ -2229,11 +2254,9 @@ module.exports.analytics = async (req, res, next) => {
       p95 = p95Results[0]?.responseTimeMs || 0;
     }
 
-    // 4. Logs (last 50)
     const rawLogs = await ApiAnalytics.find(match).sort({ timestamp: -1 }).limit(50).lean();
     const logs = rawLogs.map(l => ({ ...l, path: l.endpoint, status: l.statusCode }));
 
-    // Cumulative stats for the project
     const allTimeRequests = await Log.countDocuments({ projectId });
 
     return res.json({
@@ -2271,16 +2294,11 @@ module.exports.analytics = async (req, res, next) => {
   }
 };
 
-// FUNCTION - TOGGLE AUTH
 module.exports.toggleAuth = async (req, res) => {
   try {
     const { projectId } = req.params;
-    const { enable } = req.body; // true or false
+    const { enable } = req.body;
 
-    // Ensure user owns project, and load authProviders secrets so sanitizeAuthProviders
-    // can correctly compute hasClientSecret in the response.
-    // NOTE: If new OAuth providers are added to SOCIAL_PROVIDER_KEYS, extend this select list
-    // to include their clientSecret fields as well.
     const project = await Project.findOne({
       _id: projectId,
       owner: req.user._id,
@@ -2332,11 +2350,6 @@ module.exports.toggleAuth = async (req, res) => {
   }
 };
 
-/**
- * Updates GitHub/Google OAuth provider settings for a project.
- * Preserves existing encrypted client secrets when not provided in the update.
- * @route PUT /api/projects/:projectId/auth-providers
- */
 module.exports.updateAuthProviders = async (req, res) => {
   try {
     const { projectId } = req.params;
@@ -2379,7 +2392,6 @@ module.exports.updateAuthProviders = async (req, res) => {
         });
       }
 
-      // P1: Require siteUrl before enabling any OAuth provider
       if (nextEnabled && !project.siteUrl?.trim()) {
         return res.status(422).json({
           error: "siteUrl required",
@@ -2413,8 +2425,6 @@ module.exports.updateAuthProviders = async (req, res) => {
   }
 };
 
-
-// PATCH FOR UPDATING COLLECTION RLS
 module.exports.updateCollectionRls = async (req, res) => {
     try {
         const { projectId, collectionName } = req.params;
@@ -2452,7 +2462,6 @@ module.exports.updateCollectionRls = async (req, res) => {
             });
         }
 
-        // Restrict use of '_id' as ownerField to the 'users' collection only.
         if (nextOwnerField === '_id' && collection.name !== 'users') {
             return res.status(400).json({
                 error: "Invalid owner field",
@@ -2680,7 +2689,6 @@ module.exports.deleteContact = async (req, res) => {
         const safeAudienceId = encodeURIComponent(audienceId);
         const safeContactId = encodeURIComponent(contactId);
 
-        // Resend uses DELETE /audiences/{audience_id}/contacts/{id} or by email
         await axios.delete(`https://api.resend.com/audiences/${safeAudienceId}/contacts/${safeContactId}`, {
             headers: { Authorization: `Bearer ${key}` }
         });
@@ -2715,7 +2723,6 @@ module.exports.sendMarketingBroadcast = async (req, res) => {
             return res.status(400).json({ success: false, message: "Audience ID, subject, and html content are required." });
         }
 
-        // Mass marketing broadcasts logic using Resend Broadcasts API
         const payload = {
             audience_id: audienceId,
             subject,

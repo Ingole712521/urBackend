@@ -15,6 +15,7 @@ const mockQueryEngine = jest.fn((query) => {
         query,
         filter() { return engine; },
         sort() { return engine; },
+        limitFields() { return engine; },
         populate() { mockEnginePopulate(...arguments); return engine; },
         paginate() { return engine; },
         count() { return Promise.resolve(0); },

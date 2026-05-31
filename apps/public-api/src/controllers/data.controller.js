@@ -258,7 +258,7 @@ module.exports.getAllData = async (req, res) => {
       features.query = features.query.and([baseFilter]);
     }
 
-    features.sort().populate();
+   features.sort().limitFields().populate();
 
     const total = await features.count();
     const parsedLimit = parseInt(req.query.limit, 10);
