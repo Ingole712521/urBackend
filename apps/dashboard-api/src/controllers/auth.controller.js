@@ -44,7 +44,7 @@ const getCookieOptions = () => {
         httpOnly: true,
         expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
         secure: process.env.NODE_ENV === 'production',
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+        sameSite: 'lax'
     };
 
     if (process.env.NODE_ENV === 'production') {
@@ -83,7 +83,7 @@ const clearGithubStateCookie = (res) => {
     res.cookie(GITHUB_STATE_COOKIE, 'none', {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+        sameSite: 'lax',
         expires: new Date(Date.now() + 10 * 1000),
     });
 };
@@ -354,7 +354,7 @@ module.exports.startGithubAuth = async (req, res) => {
     res.cookie(GITHUB_STATE_COOKIE, state, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+        sameSite: 'lax',
         expires: new Date(Date.now() + GITHUB_STATE_TTL_MS),
     });
 
@@ -565,13 +565,13 @@ module.exports.resetPassword = async (req, res) => {
                 expires: new Date(Date.now() + 10 * 1000),
                 httpOnly: true,
                 secure: process.env.NODE_ENV === 'production',
-                sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+                sameSite: 'lax'
             })
             .cookie('refreshToken', 'none', {
                 expires: new Date(Date.now() + 10 * 1000),
                 httpOnly: true,
                 secure: process.env.NODE_ENV === 'production',
-                sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+                sameSite: 'lax'
             })
             .json({ message: "Password reset successfully. Please log in with your new password." });
     } catch (err) {
@@ -597,13 +597,13 @@ module.exports.logout = async (req, res) => {
             expires: new Date(Date.now() + 10 * 1000),
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
-            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+            sameSite: 'lax'
         });
         res.cookie('refreshToken', 'none', {
             expires: new Date(Date.now() + 10 * 1000),
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
-            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+            sameSite: 'lax'
         });
 
         res.status(200).json({ success: true, message: "Logged out successfully" });
