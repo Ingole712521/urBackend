@@ -609,4 +609,79 @@ describe('public userAuth social auth', () => {
         expect(res.redirect).toHaveBeenCalledWith(expect.stringContaining('error='));
         expect(res.redirect).toHaveBeenCalledWith(expect.stringContaining('not+verified'));
     });
+
+    test('handleSocialAuthCallback rejects soft-deleted user by provider id', async () => {
+        redis.get.mockResolvedValueOnce(JSON.stringify({
+            projectId: 'project_1',
+            provider: 'github',
+            callbackUrl: 'http://localhost:5173/auth/callback',
+        }));
+        mockProjectFindByIdChain.lean.mockResolvedValueOnce(makeProject());
+
+        // mock soft deleted user
+        mockUsersModel.findOne.mockResolvedValueOnce({
+            _id: 'deleted_user',
+            githubId: '123',
+            isDeleted: true,
+            deletedAt: new Date().toISOString()
+        });
+
+        global.fetch
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({ access_token: 'github_access_token' }),
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({ id: 123, login: 'alice', avatar_url: '' }),
+            });
+
+        const req = makeReq({ params: { provider: 'github' }, query: { code: 'code_1', state: 'state_1' } });
+        const res = makeRes();
+
+        await controller.handleSocialAuthCallback(req, res);
+
+        expect(res.redirect).toHaveBeenCalledWith(expect.stringContaining('error='));
+        expect(res.redirect).toHaveBeenCalledWith(expect.stringContaining('deleted'));
+    });
+
+    test('handleSocialAuthCallback rejects soft-deleted user by verified email', async () => {
+        redis.get.mockResolvedValueOnce(JSON.stringify({
+            projectId: 'project_1',
+            provider: 'github',
+            callbackUrl: 'http://localhost:5173/auth/callback',
+        }));
+        mockProjectFindByIdChain.lean.mockResolvedValueOnce(makeProject());
+
+        mockUsersModel.findOne
+            .mockResolvedValueOnce(null)
+            .mockResolvedValueOnce({
+                _id: 'deleted_user',
+                email: 'alice@example.com',
+                isDeleted: true,
+                deletedAt: new Date().toISOString()
+            });
+
+        global.fetch
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({ access_token: 'github_access_token' }),
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({ id: 123, login: 'alice', avatar_url: '' }),
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => ([{ email: 'alice@example.com', verified: true, primary: true }]),
+            });
+
+        const req = makeReq({ params: { provider: 'github' }, query: { code: 'code_1', state: 'state_1' } });
+        const res = makeRes();
+
+        await controller.handleSocialAuthCallback(req, res);
+
+        expect(res.redirect).toHaveBeenCalledWith(expect.stringContaining('error='));
+        expect(res.redirect).toHaveBeenCalledWith(expect.stringContaining('deleted'));
+    });
 });

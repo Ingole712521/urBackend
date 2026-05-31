@@ -416,9 +416,11 @@ class AuthModule:
             AuthError: ``rtCode`` or ``token`` invalid or expired.
 
         Example:
-            >>> # In a Django callback view:
-            >>> rt_code = request.GET.get("rtCode")
-            >>> token   = request.GET.get("token")
+            >>> # The frontend must extract the token from the URL fragment (#token=...)
+            >>> # and send it to your backend (e.g., via a POST request), along with rtCode.
+            >>> payload = request.json()
+            >>> rt_code = payload.get("rtCode")
+            >>> token   = payload.get("token")
             >>> session = client.auth.social_exchange(rt_code, token)
             >>> # Now call refresh_token to get an accessToken:
             >>> new_session = client.auth.refresh_token(session["refreshToken"])

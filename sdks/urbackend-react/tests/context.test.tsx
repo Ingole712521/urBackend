@@ -70,6 +70,13 @@ describe('UrProvider & useUrContext', () => {
       search: '?rtCode=test-rt-code',
       hash: '#token=test-temp-token',
       pathname: '/auth/callback',
+    } as any;
+
+    const originalHistory = window.history;
+    // @ts-ignore
+    delete window.history;
+    window.history = {
+      ...originalHistory,
       replaceState: vi.fn(),
     } as any;
 
@@ -99,7 +106,8 @@ describe('UrProvider & useUrContext', () => {
       expect(mockAuthInstance.socialExchange).toHaveBeenCalledWith({ token: 'test-temp-token', rtCode: 'test-rt-code' });
     }
 
-    // Restore window.location
+    // Restore window.location and window.history
     window.location = originalLocation;
+    window.history = originalHistory;
   });
 });

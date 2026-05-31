@@ -5,7 +5,7 @@ function App() {
   const { user, isAuthenticated, isInitializing, logout } = useAuth();
 
   if (isInitializing) {
-    return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: 'white' }}>Loading urBackend...</div>;
+    return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: '#64748b', background: '#f8fafc' }}>Loading urBackend...</div>;
   }
 
   if (!isAuthenticated) {

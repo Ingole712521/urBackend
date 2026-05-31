@@ -13,7 +13,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@urbackend/sdk": "file:../urbackend-sdk"
+    "@urbackend/sdk": "^0.1.0"
   },
   "peerDependencies": {
     "react": ">=17.0.0",

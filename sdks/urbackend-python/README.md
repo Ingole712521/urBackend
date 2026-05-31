@@ -146,10 +146,13 @@ url = client.auth.social_start_url("github")   # or "google"
 # In Django: return redirect(url)
 
 # 2. After the user returns to <siteUrl>/auth/callback?rtCode=...#token=...
-#    exchange BOTH the rtCode and the one-time token (backend requires both)
-rt_code = request.GET.get("rtCode")
-# Token must be parsed from the URL fragment (#token=...), not query string
-token   = parse_fragment(request).get("token")
+#    The fragment (#token=...) is NOT sent to the server automatically.
+#    Your frontend must parse it and POST both values to your Python backend.
+#    Example (Django receiving a JSON POST from the frontend):
+import json
+body = json.loads(request.body)
+rt_code = body.get("rtCode")
+token   = body.get("token")
 session = client.auth.social_exchange(rt_code, token)
 
 # 3. Use the returned refreshToken to get an accessToken

@@ -94,9 +94,13 @@ function ProjectDetails() {
                         <div style={{ display: 'flex', alignItems: 'center', background: '#000', borderRadius: '6px', border: '1px solid var(--color-border)', marginBottom: '1.5rem', overflow: 'hidden' }}>
                             <code style={{ flex: 1, padding: '12px', fontSize: '0.85rem', wordBreak: 'break-all', color: 'var(--color-primary)', borderRight: '1px solid var(--color-border)' }}>{newKey.key}</code>
                             <button 
-                                onClick={() => {
-                                    navigator.clipboard.writeText(newKey.key);
-                                    toast.success("Copied to clipboard!");
+                                onClick={async () => {
+                                    try {
+                                        await navigator.clipboard.writeText(newKey.key);
+                                        toast.success("Copied to clipboard!");
+                                    } catch {
+                                        toast.error("Failed to copy to clipboard");
+                                    }
                                 }} 
                                 style={{ padding: '0 16px', background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                                 title="Copy"

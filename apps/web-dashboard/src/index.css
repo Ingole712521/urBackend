@@ -190,19 +190,6 @@ a {
   padding: 1.5rem; /* Reduced from 2rem */
 }
 
-/* Glassmorphism Panel */
-.glass-card {
-  background: var(--color-glass-card-bg);
-  backdrop-filter: var(--glass-backdrop);
-  border: 1px solid var(--color-glass-card-border);
-  box-shadow: 0 4px 24px -8px rgba(0, 0, 0, 0.5);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.glass-card:hover {
-  border-color: rgba(255, 255, 255, 0.12);
-  box-shadow: 0 12px 32px -12px rgba(0, 0, 0, 0.6);
-}
 
 /* Premium Card */
 .card {

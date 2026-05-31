@@ -64,8 +64,9 @@ export const UrProvider: React.FC<UrProviderProps> = ({ apiKey, baseUrl, childre
             // Exchange for long-lived refresh token
             try {
               await auth.socialExchange({ token, rtCode });
-            } catch (err) {
+            } catch (err: any) {
               console.error('Failed to exchange refresh token', err);
+              if (mounted) setError(err.message || 'Failed to complete social login');
             }
           }
           window.history.replaceState({}, document.title, window.location.pathname);

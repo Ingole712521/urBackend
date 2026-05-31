@@ -17,12 +17,16 @@ export const Toast: React.FC<ToastProps> = ({ message, type, onClose, isDark = f
       setIsVisible(true);
     });
 
+    let innerTimer: ReturnType<typeof setTimeout>;
     const timer = setTimeout(() => {
       setIsLeaving(true);
-      setTimeout(onClose, 300); // Wait for exit animation
+      innerTimer = setTimeout(onClose, 300); // Wait for exit animation
     }, 4000);
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      if (innerTimer) clearTimeout(innerTimer);
+    };
   }, [onClose]);
 
   const bgColor = isDark ? 'rgba(30, 30, 30, 0.9)' : 'rgba(255, 255, 255, 0.9)';

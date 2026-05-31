@@ -17,6 +17,10 @@ export class UrBackendClient {
   private headers: Record<string, string>;
 
   constructor(config: UrBackendConfig) {
+    if (!config.apiKey) {
+      throw new Error('urbackend-sdk: apiKey is required to initialize the client.');
+    }
+
     this.apiKey = config.apiKey;
     this.baseUrl = config.baseUrl || 'https://api.ub.bitbros.in';
     this.headers = config.headers || {};

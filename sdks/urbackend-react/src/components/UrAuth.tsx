@@ -3,13 +3,13 @@ import { useAuth } from '../hooks';
 import { Toast } from './Toast';
 
 export interface UrAuthProps {
-  providers?: ('google' | 'github' | 'apple')[];
+  providers?: ('google' | 'github')[];
   theme?: 'light' | 'dark'; // Dark mode not perfectly matched to image, but kept for API compat
   onSuccess?: () => void;
 }
 
 export const UrAuth: React.FC<UrAuthProps> = ({ 
-  providers = ['google', 'apple', 'github'], 
+  providers = ['google', 'github'], 
   theme = 'light',
   onSuccess
 }) => {
@@ -126,6 +126,9 @@ export const UrAuth: React.FC<UrAuthProps> = ({
       color: text,
       cursor: 'pointer',
       textDecoration: 'none',
+      background: 'none',
+      border: 'none',
+      padding: 0,
     },
     input: {
       width: '100%',
@@ -202,6 +205,9 @@ export const UrAuth: React.FC<UrAuthProps> = ({
       textDecoration: 'underline',
       cursor: 'pointer',
       marginLeft: '4px',
+      background: 'none',
+      border: 'none',
+      padding: 0,
     }
   };
 
@@ -328,9 +334,9 @@ export const UrAuth: React.FC<UrAuthProps> = ({
               <div style={styles.labelRow}>
                 <label style={styles.label}>{mode === 'reset' ? 'New Password' : 'Password'}</label>
                 {mode === 'signin' && (
-                  <span style={styles.forgotLink} onClick={() => { setMode('forgot'); clearError(); }}>
+                  <button type="button" style={styles.forgotLink} onClick={() => { setMode('forgot'); clearError(); }}>
                     Forgot password?
-                  </span>
+                  </button>
                 )}
               </div>
               <input
@@ -374,12 +380,6 @@ export const UrAuth: React.FC<UrAuthProps> = ({
                   Continue with Google
                 </button>
               )}
-              {providers.includes('apple') && (
-                <button style={styles.socialBtn} onClick={() => alert('Apple login not implemented in demo')} type="button">
-                  <AppleIcon />
-                  Continue with Apple
-                </button>
-              )}
               {providers.includes('github') && (
                 <button style={styles.socialBtn} onClick={() => socialLogin('github')} type="button">
                   <GithubIcon />
@@ -395,7 +395,8 @@ export const UrAuth: React.FC<UrAuthProps> = ({
         {mode === 'signin' ? "Don't have an account yet?" 
           : mode === 'signup' ? "Already have an account?"
           : "Remember your password?"}
-        <span 
+        <button 
+          type="button"
           style={styles.footerLink}
           onClick={() => {
             setMode(mode === 'signin' ? 'signup' : 'signin');
@@ -403,7 +404,7 @@ export const UrAuth: React.FC<UrAuthProps> = ({
           }}
         >
           {mode === 'signin' ? 'Sign up' : 'Log in'}
-        </span>
+        </button>
       </div>
     </div>
   );
