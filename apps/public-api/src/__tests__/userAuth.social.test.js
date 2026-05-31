@@ -482,6 +482,7 @@ describe('public userAuth social auth', () => {
         expect(res.status).toHaveBeenCalledWith(400);
         expect(res.json).toHaveBeenCalledWith({
             success: false,
+            data: {},
             message: 'Invalid or expired refresh token exchange code',
         });
     });
@@ -503,6 +504,7 @@ describe('public userAuth social auth', () => {
         expect(res.status).toHaveBeenCalledWith(403);
         expect(res.json).toHaveBeenCalledWith({
             success: false,
+            data: {},
             message: 'Invalid refresh token exchange payload',
         });
     });
@@ -634,6 +636,10 @@ describe('public userAuth social auth', () => {
             .mockResolvedValueOnce({
                 ok: true,
                 json: async () => ({ id: 123, login: 'alice', avatar_url: '' }),
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => ([{ email: 'alice@example.com', primary: true, verified: true }]),
             });
 
         const req = makeReq({ params: { provider: 'github' }, query: { code: 'code_1', state: 'state_1' } });
@@ -642,7 +648,7 @@ describe('public userAuth social auth', () => {
         await controller.handleSocialAuthCallback(req, res);
 
         expect(res.redirect).toHaveBeenCalledWith(expect.stringContaining('error='));
-        expect(res.redirect).toHaveBeenCalledWith(expect.stringContaining('deleted'));
+        expect(res.redirect).toHaveBeenCalledWith(expect.stringContaining('deletion'));
     });
 
     test('handleSocialAuthCallback rejects soft-deleted user by verified email', async () => {
@@ -682,6 +688,6 @@ describe('public userAuth social auth', () => {
         await controller.handleSocialAuthCallback(req, res);
 
         expect(res.redirect).toHaveBeenCalledWith(expect.stringContaining('error='));
-        expect(res.redirect).toHaveBeenCalledWith(expect.stringContaining('deleted'));
+        expect(res.redirect).toHaveBeenCalledWith(expect.stringContaining('deletion'));
     });
 });
