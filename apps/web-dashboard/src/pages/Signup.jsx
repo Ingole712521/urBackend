@@ -96,12 +96,13 @@ function Signup() {
 
   return (
     <AuthShell
-      modeLabel="Create account"
+      modeLabel="← Home / Create Account"
       title=""
       subtitle=""
       alternateText="Already have access?"
       alternateLabel="Sign in instead"
       alternateTo="/login"
+      onModeClick={() => navigate('/')}
     >
       <form className="auth-form" onSubmit={handleSubmit}>
         <button
