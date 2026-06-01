@@ -217,8 +217,14 @@ module.exports.getAllData = async (req, res) => {
     const collectionConfig = project.collections.find(
       (c) => c.name === collectionName,
     );
-    if (!collectionConfig)
-      return res.status(404).json({ error: "Collection not found" });
+
+    if (!collectionConfig) {
+      return res.status(404).json({
+        success: false,
+        data: {},
+        message: "Collection not found",
+      });
+    }
 
     const connection = await getConnection(project._id);
     const Model = getCompiledModel(
@@ -264,7 +270,6 @@ module.exports.getAllData = async (req, res) => {
     const parsedLimit = parseInt(req.query.limit, 10);
     const limit = Math.max(1, Math.min(Number.isNaN(parsedLimit) ? 100 : parsedLimit, 100));
 
-    // Use cursor-based pagination if cursor parameter is provided, otherwise use offset-based
     const useCursor = !!req.query.cursor;
     if (useCursor) {
       features.cursorPaginate();
@@ -274,7 +279,6 @@ module.exports.getAllData = async (req, res) => {
 
     const data = await features.query.lean();
 
-    // Handle cursor pagination: slice to actual limit and generate next cursor
     let items = data;
     let nextCursor = null;
     if (useCursor) {
@@ -327,7 +331,6 @@ module.exports.getAllData = async (req, res) => {
     });
   }
 };
-
 // GET SINGLE DOC
 module.exports.getSingleDoc = async (req, res) => {
   try {

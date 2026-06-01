@@ -332,16 +332,29 @@ module.exports.getAllProject = async (req, res) => {
 
     const projectIds = projects.map(p => p._id);
     const recentLogs = await Log.aggregate([
-      { $match: { projectId: { $in: projectIds } } },
-      { $sort: { timestamp: -1 } },
-      { $limit: 100 },
-      { $group: {
-          _id: "$projectId",
-          errorCount: { $sum: { $cond: [{ $gte: ["$status", 400] }, 1, 0] } },
-          successCount: { $sum: { $cond: [{ $lt: ["$status", 400] }, 1, 0] } }
+  { $match: { projectId: { $in: projectIds } } },
+  { $sort: { timestamp: -1 } },
+  {
+    $group: {
+      _id: "$projectId",
+      logs: { $topN: { n: 100, sortBy: { timestamp: -1 }, output: { status: "$status" } } }
+    }
+  },
+  {
+    $project: {
+      errorCount: {
+        $size: {
+          $filter: { input: "$logs", as: "l", cond: { $gte: ["$$l.status", 400] } }
+        }
+      },
+      successCount: {
+        $size: {
+          $filter: { input: "$logs", as: "l", cond: { $lt: ["$$l.status", 400] } }
         }
       }
-    ]);
+    }
+  }
+]);
 
     const logsMap = recentLogs.reduce((acc, log) => {
       acc[log._id.toString()] = log;
@@ -395,8 +408,7 @@ module.exports.getSingleProject = async (req, res) => {
           "+resendApiKey.iv " +
           "+resendApiKey.tag",
       );
-      if (!project)
-        return res.status(404).json({ error: "Project not found." });
+      if (!project) return res.status(404).json({ success: false, data: {}, message: "Project not found." });
       projectObj = project.toObject();
       await setProjectById(req.params.projectId, projectObj);
     }
@@ -763,14 +775,13 @@ module.exports.getData = async (req, res) => {
     try {
         const { projectId, collectionName } = req.params;
         const project = await Project.findOne({ _id: projectId, owner: req.user._id });
-        if (!project) return res.status(404).json({ error: "Project not found." });
+       if (!project) return res.status(404).json({ success: false, data: {}, message: "Project not found." });
+
+
 
         const collectionConfig = project.collections.find(c => c.name === collectionName);
         if (!collectionConfig) {
-            return res.status(404).json({
-                error: "Collection not found",
-                collection: collectionName
-            });
+         return res.status(404).json({ success: false, data: {}, message: `Collection ${collectionName} not found.` });
         }
 
         const connection = await getConnection(projectId);
@@ -850,10 +861,11 @@ module.exports.getData = async (req, res) => {
             message: "Data fetched successfully.",
         });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+    if (err?.statusCode === 400 || err?.name === 'QueryFilterError') {
+        return res.status(400).json({ success: false, data: {}, message: err.message || "Invalid query filter." });
     }
 };
-
+};
 module.exports.deleteCollection = async (req, res) => {
   try {
     const { projectId, collectionName } = req.params;
@@ -925,10 +937,8 @@ module.exports.insertData = async (req, res) => {
       (c) => c.name === collectionName,
     );
     if (!collectionConfig) {
-      return res
-        .status(404)
-        .json({ error: "Collection configuration not found." });
-    }
+    return res.status(404).json({ success: false, data: {}, message: `Collection ${collectionName} not found.` });
+}
 
     // Prevent manual injection of soft-delete fields
     delete incomingData.isDeleted;

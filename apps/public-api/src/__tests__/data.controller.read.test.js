@@ -27,7 +27,7 @@ jest.mock('@urbackend/common', () => ({
     sanitize: (v) => v,
     Project: {},
     getConnection: jest.fn().mockResolvedValue({}),
-    getCompiledModel: jest.fn(() => ({
+    getCompiledModel: jest.fn((connection, collectionConfig, projectId, isExternal) => ({
         find: (...args) => {
             mockFind(...args);
             return { 
