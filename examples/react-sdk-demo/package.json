@@ -10,8 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@urbackend/react": "file:../../sdks/urbackend-react",
-    "@urbackend/sdk": "file:../../sdks/urbackend-sdk",
+    "@urbackend/react": "^0.1.0",
+    "@urbackend/sdk": "^0.4.2",
     "react": "^19.2.6",
     "react-dom": "^19.2.6"
   },
