@@ -20,7 +20,9 @@ export const useAuth = () => {
     try {
       setError(null);
       setIsLoading(true);
-      await auth.login(payload);
+      const res = await auth.login(payload);
+      const token = res.accessToken || (res as any).token;
+      if (token && typeof window !== 'undefined') localStorage.setItem('ur_auth_token', token);
       const currentUser = await auth.me();
       setUser(currentUser);
     } catch (err: any) {
@@ -50,6 +52,7 @@ export const useAuth = () => {
       setError(null);
       setIsLoading(true);
       await auth.logout();
+      if (typeof window !== 'undefined') localStorage.removeItem('ur_auth_token');
       setUser(null);
     } catch (err: any) {
       setError(err.message || 'Logout failed');

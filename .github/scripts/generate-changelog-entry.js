@@ -46,9 +46,9 @@ Rules:
 - If no PRs were merged, output: <Update label="${TODAY}" description="Week of ${WEEK_START}–${TODAY}" tags={[]}>No significant changes this week.</Update>`;
 
 const payload = JSON.stringify({
-  model: "openai/gpt-oss-120b",
+  model: "llama-3.1-70b-versatile",
   messages: [{ role: "user", content: prompt }],
-  max_tokens: 1000,
+  max_tokens: 4096,
   temperature: 0.3,
 });
 

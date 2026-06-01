@@ -1,20 +1,50 @@
-import { UrAuth, useAuth } from '@urbackend/react';
+import { useState, useEffect } from 'react';
+import { UrAuth, useAuth, useUser, ProtectedRoute, GuestRoute } from '@urbackend/react';
 import './App.css';
 
+// Mini router component for the demo
 function App() {
-  const { user, isAuthenticated, isInitializing, logout } = useAuth();
+  const [route, setRoute] = useState(window.location.pathname);
 
-  if (isInitializing) {
-    return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: '#64748b', background: '#f8fafc' }}>Loading urBackend...</div>;
-  }
+  // Sync route state with browser history for back button
+  useEffect(() => {
+    const handlePop = () => setRoute(window.location.pathname);
+    window.addEventListener('popstate', handlePop);
+    return () => window.removeEventListener('popstate', handlePop);
+  }, []);
 
-  if (!isAuthenticated) {
+  const navigate = (path: string) => {
+    window.history.pushState({}, '', path);
+    setRoute(path);
+  };
+
+  const LoadingFallback = (
+    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: '#64748b', background: '#f8fafc' }}>
+      Loading urBackend...
+    </div>
+  );
+
+  if (route === '/login') {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: '#f8fafc' }}>
-        <UrAuth providers={['google', 'github']} theme="light" />
-      </div>
+      <GuestRoute fallback={LoadingFallback} onRedirect={() => navigate('/')}>
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: '#f8fafc' }}>
+          <UrAuth providers={['google', 'github']} theme="light" />
+        </div>
+      </GuestRoute>
     );
   }
+
+  // Default to protected dashboard
+  return (
+    <ProtectedRoute fallback={LoadingFallback} onRedirect={() => navigate('/login')}>
+      <Dashboard />
+    </ProtectedRoute>
+  );
+}
+
+function Dashboard() {
+  const { user } = useUser();
+  const { logout } = useAuth();
 
   return (
     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: '#f8fafc', padding: '24px' }}>
@@ -22,7 +52,7 @@ function App() {
         width: '100%', 
         maxWidth: '500px', 
         background: '#ffffff', 
-        borderRadius: '24px', 
+        borderRadius: '0', 
         padding: '40px', 
         boxShadow: '0 20px 40px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.05)',
         border: '1px solid #e2e8f0',
@@ -31,9 +61,9 @@ function App() {
         
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '32px' }}>
           {user?.avatarUrl ? (
-            <img src={user.avatarUrl} alt="Avatar" style={{ width: '64px', height: '64px', borderRadius: '32px', objectFit: 'cover' }} />
+            <img src={user.avatarUrl} alt="Avatar" style={{ width: '64px', height: '64px', borderRadius: '0', objectFit: 'cover' }} />
           ) : (
-            <div style={{ width: '64px', height: '64px', borderRadius: '32px', background: 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', fontWeight: 600, color: '#64748b' }}>
+            <div style={{ width: '64px', height: '64px', borderRadius: '0', background: 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', fontWeight: 600, color: '#64748b' }}>
               {user?.name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase()}
             </div>
           )}
@@ -43,7 +73,7 @@ function App() {
           </div>
         </div>
 
-        <div style={{ background: '#f8fafc', borderRadius: '16px', padding: '20px', border: '1px solid #e2e8f0', marginBottom: '32px' }}>
+        <div style={{ background: '#f8fafc', borderRadius: '0', padding: '20px', border: '1px solid #e2e8f0', marginBottom: '32px' }}>
           <h3 style={{ margin: '0 0 16px', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '1px', color: '#94a3b8', fontWeight: 600 }}>Your Profile</h3>
           
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', fontSize: '14px' }}>
@@ -67,7 +97,7 @@ function App() {
           style={{ 
             width: '100%', 
             padding: '14px', 
-            borderRadius: '12px', 
+            borderRadius: '0', 
             background: 'linear-gradient(180deg, #2a2a2a 0%, #111111 100%)', 
             color: '#ffffff', 
             fontSize: '15px', 

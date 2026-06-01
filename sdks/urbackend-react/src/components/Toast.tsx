@@ -39,12 +39,12 @@ export const Toast: React.FC<ToastProps> = ({ message, type, onClose, isDark = f
       <style>
         {`
           @keyframes slideIn {
-            from { transform: translateY(-20px) scale(0.95); opacity: 0; }
-            to { transform: translateY(0) scale(1); opacity: 1; }
+            from { transform: translate(-50%, -20px) scale(0.95); opacity: 0; }
+            to { transform: translate(-50%, 0) scale(1); opacity: 1; }
           }
           @keyframes slideOut {
-            from { transform: translateY(0) scale(1); opacity: 1; }
-            to { transform: translateY(-20px) scale(0.95); opacity: 0; }
+            from { transform: translate(-50%, 0) scale(1); opacity: 1; }
+            to { transform: translate(-50%, -20px) scale(0.95); opacity: 0; }
           }
         `}
       </style>
@@ -59,7 +59,7 @@ export const Toast: React.FC<ToastProps> = ({ message, type, onClose, isDark = f
           alignItems: 'center',
           gap: '12px',
           padding: '12px 20px',
-          borderRadius: '12px',
+          borderRadius: '0',
           background: bgColor,
           backdropFilter: 'blur(16px)',
           WebkitBackdropFilter: 'blur(16px)',

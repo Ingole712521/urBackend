@@ -21,6 +21,10 @@ var UrProvider = ({ apiKey, baseUrl, children }) => {
     let mounted = true;
     const initAuth = async () => {
       try {
+        if (typeof window !== "undefined") {
+          const savedToken = localStorage.getItem("ur_auth_token");
+          if (savedToken) auth.setToken(savedToken);
+        }
         const urlParams = new URLSearchParams(window.location.search);
         const hashParams = new URLSearchParams(window.location.hash.substring(1));
         const token = hashParams.get("token");
@@ -32,9 +36,12 @@ var UrProvider = ({ apiKey, baseUrl, children }) => {
           window.history.replaceState({}, document.title, window.location.pathname);
         } else if (token) {
           auth.setToken(token);
+          if (typeof window !== "undefined") localStorage.setItem("ur_auth_token", token);
           if (rtCode) {
             try {
-              await auth.socialExchange({ token, rtCode });
+              const exRes = await auth.socialExchange({ token, rtCode });
+              const exToken = exRes.accessToken || exRes.token;
+              if (exToken && typeof window !== "undefined") localStorage.setItem("ur_auth_token", exToken);
             } catch (err) {
               console.error("Failed to exchange refresh token", err);
               if (mounted) setError(err.message || "Failed to complete social login");
@@ -44,7 +51,9 @@ var UrProvider = ({ apiKey, baseUrl, children }) => {
           window.history.replaceState({}, document.title, window.location.pathname);
         } else {
           try {
-            await auth.refreshToken();
+            const res = await auth.refreshToken();
+            const newToken = res.accessToken || res.token;
+            if (newToken && typeof window !== "undefined") localStorage.setItem("ur_auth_token", newToken);
           } catch (e) {
           }
         }
@@ -101,7 +110,9 @@ var useAuth = () => {
     try {
       setError(null);
       setIsLoading(true);
-      await auth.login(payload);
+      const res = await auth.login(payload);
+      const token = res.accessToken || res.token;
+      if (token && typeof window !== "undefined") localStorage.setItem("ur_auth_token", token);
       const currentUser = await auth.me();
       setUser(currentUser);
     } catch (err) {
@@ -129,6 +140,7 @@ var useAuth = () => {
       setError(null);
       setIsLoading(true);
       await auth.logout();
+      if (typeof window !== "undefined") localStorage.removeItem("ur_auth_token");
       setUser(null);
     } catch (err) {
       setError(err.message || "Logout failed");
@@ -311,12 +323,12 @@ var Toast = ({ message, type, onClose, isDark = false }) => {
   return /* @__PURE__ */ jsxs(Fragment2, { children: [
     /* @__PURE__ */ jsx3("style", { children: `
           @keyframes slideIn {
-            from { transform: translateY(-20px) scale(0.95); opacity: 0; }
-            to { transform: translateY(0) scale(1); opacity: 1; }
+            from { transform: translate(-50%, -20px) scale(0.95); opacity: 0; }
+            to { transform: translate(-50%, 0) scale(1); opacity: 1; }
           }
           @keyframes slideOut {
-            from { transform: translateY(0) scale(1); opacity: 1; }
-            to { transform: translateY(-20px) scale(0.95); opacity: 0; }
+            from { transform: translate(-50%, 0) scale(1); opacity: 1; }
+            to { transform: translate(-50%, -20px) scale(0.95); opacity: 0; }
           }
         ` }),
     /* @__PURE__ */ jsxs(
@@ -332,7 +344,7 @@ var Toast = ({ message, type, onClose, isDark = false }) => {
           alignItems: "center",
           gap: "12px",
           padding: "12px 20px",
-          borderRadius: "12px",
+          borderRadius: "0",
           background: bgColor,
           backdropFilter: "blur(16px)",
           WebkitBackdropFilter: "blur(16px)",
@@ -416,7 +428,7 @@ var UrAuth = ({
       width: "100%",
       maxWidth: "420px",
       margin: "0 auto",
-      borderRadius: "24px",
+      borderRadius: "0",
       background: bg,
       boxShadow: isDark ? "0 20px 40px rgba(0,0,0,0.5)" : "0 20px 40px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.05)",
       border: `1px solid ${border}`,
@@ -437,14 +449,14 @@ var UrAuth = ({
       display: "inline-flex",
       background: isDark ? "#2a2a2a" : "#f1f5f9",
       padding: "4px",
-      borderRadius: "100px"
+      borderRadius: "0"
     },
     switchBtn: (active) => ({
       display: "flex",
       alignItems: "center",
       gap: "6px",
       padding: "8px 20px",
-      borderRadius: "100px",
+      borderRadius: "0",
       fontSize: "13px",
       fontWeight: 600,
       cursor: "pointer",
@@ -481,7 +493,7 @@ var UrAuth = ({
     input: {
       width: "100%",
       padding: "12px 16px",
-      borderRadius: "12px",
+      borderRadius: "0",
       border: `1px solid ${border}`,
       background: inputBg,
       color: text,
@@ -493,7 +505,7 @@ var UrAuth = ({
     primaryBtn: {
       width: "100%",
       padding: "14px",
-      borderRadius: "12px",
+      borderRadius: "0",
       background: "linear-gradient(180deg, #2a2a2a 0%, #111111 100%)",
       color: "#ffffff",
       fontSize: "15px",
@@ -524,7 +536,7 @@ var UrAuth = ({
     socialBtn: {
       width: "100%",
       padding: "12px",
-      borderRadius: "12px",
+      borderRadius: "0",
       border: `1px solid ${border}`,
       background: isDark ? "#2a2a2a" : "#ffffff",
       color: text,

@@ -14,7 +14,10 @@ const formatFromAddress = (email_address) => {
         return FALLBACK_FROM_ADDRESS;
     }
 
-    // simplified the sender formatting logic and removed the regex based parsing to avoid the CodeQL warning
+    // If the address already includes a custom name format (e.g., "Name <email@domain.com>")
+    if (trimmed.includes('<') && trimmed.endsWith('>')) {
+        return trimmed;
+    }
 
     return `urBackend <${trimmed}>`;
 };
