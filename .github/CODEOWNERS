@@ -1,10 +1,5 @@
-# Global Owners (Fallback for everything)
 * @yash-pouranik
-
-# Core Maintainers / Reviewers
 /sdks/ @Nitin-kumar-yadav1307 @yash-pouranik
 /apps/ @Nitin-kumar-yadav1307 @yash-pouranik
 /packages/ @Nitin-kumar-yadav1307 @yash-pouranik
-
-# CI/CD and DevOps (Usually restricted to project owner)
 /.github/ @yash-pouranik
