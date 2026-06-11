@@ -83,7 +83,7 @@ function Dashboard() {
         
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '32px' }}>
           {user?.avatarUrl ? (
-            <img src={user.avatarUrl as string} alt="Avatar" style={{ width: '64px', height: '64px', borderRadius: '0', objectFit: 'cover' }} />
+                <img src={user.avatarUrl as string} alt="Avatar" style={{ width: '64px', height: '64px', borderRadius: '0', objectFit: 'cover' }} />
           ) : (
             <div style={{ width: '64px', height: '64px', borderRadius: '0', background: 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', fontWeight: 600, color: '#64748b' }}>
               {user?.name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase()}

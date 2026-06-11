@@ -178,7 +178,7 @@ export const UrAuth: React.FC<UrAuthProps> = ({
     } else if (typeof providers === 'object') {
       isGoogleEnabled = !!providers.google;
       isGithubEnabled = !!providers.github;
-      isEmailPasswordEnabled = providers.emailPassword !== undefined ? providers.emailPassword : false;
+       isEmailPasswordEnabled = providers.emailPassword !== undefined ? providers.emailPassword : enableEmailPassword;
     }
   }
 
