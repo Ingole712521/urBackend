@@ -67,7 +67,7 @@ function Login() {
       const response = await api.post('/api/auth/login', formData);
 
       if (response.data.success) {
-        login(response.data.user);
+        login(response.data.data.user);
         toast.dismiss(loadingToast);
         toast.success('Welcome back.');
         navigate('/dashboard');

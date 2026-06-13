@@ -12,7 +12,7 @@ export const AuthProvider = ({ children }) => {
             try {
                 const response = await api.get('/api/auth/me');
                 if (response.data.success) {
-                    setUser(response.data.user);
+                    setUser(response.data.data.user);
                 }
             } catch (err) {
                 console.error("Not authenticated:", err.message);

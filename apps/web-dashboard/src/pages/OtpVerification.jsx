@@ -58,7 +58,7 @@ function OtpVerification() {
             toast.success('Email verified successfully!');
 
             if (res.data.success) {
-                login(res.data.user);
+                login(res.data.data.user);
             }
             navigate('/dashboard');
         } catch (err) {
