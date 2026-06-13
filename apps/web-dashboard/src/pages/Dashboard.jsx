@@ -51,8 +51,8 @@ export default function Dashboard() {
           api.get('/api/analytics/activity')
         ]);
         
-        setProjects(projectsRes.data);
-        setActivity(activityRes.data);
+        setProjects(projectsRes.data.success ? projectsRes.data.data : projectsRes.data);
+        setActivity(activityRes.data.success ? activityRes.data.data : activityRes.data);
 
         // fetchPlanData updates PlanContext which UsageQuota reads from
         await fetchPlanData();
