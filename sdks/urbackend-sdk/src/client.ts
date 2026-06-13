@@ -90,8 +90,9 @@ export class UrBackendClient {
       ...this.headers,
     };
 
-    if (options.token) {
-      headers['Authorization'] = `Bearer ${options.token}`;
+    const activeToken = options.token || this._auth?.getToken();
+    if (activeToken) {
+      headers['Authorization'] = `Bearer ${activeToken}`;
     }
 
     // Merge custom headers from options if provided
