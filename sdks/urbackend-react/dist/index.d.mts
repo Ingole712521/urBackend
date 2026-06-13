@@ -133,6 +133,8 @@ interface AuthLabels {
     footerSignupPrompt: string;
     footerForgotPrompt: string;
     noAuthMethods: string;
+    forgotSubtitle: string;
+    resetSubtitle: string;
     signInTitle?: string;
     signUpTitle?: string;
     signInTab?: string;

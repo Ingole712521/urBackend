@@ -400,7 +400,9 @@ var defaultLabels = {
   footerSigninPrompt: "Don't have an account yet?",
   footerSignupPrompt: "Already have an account?",
   footerForgotPrompt: "Remember your password?",
-  noAuthMethods: "No authentication methods are enabled for this screen."
+  noAuthMethods: "No authentication methods are enabled for this screen.",
+  forgotSubtitle: "Welcome back",
+  resetSubtitle: "Enter the code sent to {email}"
 };
 var defaultThemeColors = {
   light: {
@@ -430,6 +432,28 @@ var defaultThemeColors = {
     socialButtonBackground: "#2a2a2a"
   }
 };
+var adjustColor = (color, percent) => {
+  try {
+    if (color.startsWith("#")) {
+      let hex = color.replace("#", "");
+      if (hex.length === 3) {
+        hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+      }
+      let r = parseInt(hex.substring(0, 2), 16);
+      let g = parseInt(hex.substring(2, 4), 16);
+      let b = parseInt(hex.substring(4, 6), 16);
+      r = Math.min(255, Math.max(0, r + percent));
+      g = Math.min(255, Math.max(0, g + percent));
+      b = Math.min(255, Math.max(0, b + percent));
+      const rr = r.toString(16).padStart(2, "0");
+      const gg = g.toString(16).padStart(2, "0");
+      const bb = b.toString(16).padStart(2, "0");
+      return `#${rr}${gg}${bb}`;
+    }
+  } catch (e) {
+  }
+  return color;
+};
 var UrAuth = ({
   providers = ["google", "github"],
   enableEmailPassword = true,
@@ -449,15 +473,16 @@ var UrAuth = ({
   const text = {
     ...defaultLabels,
     ...labels,
-    loginTab: labels?.signInTab || labels?.loginTab || defaultLabels.loginTab,
-    loginTitle: labels?.signInTitle || labels?.loginTitle || defaultLabels.loginTitle,
-    loginButton: labels?.signInButton || labels?.loginButton || defaultLabels.loginButton,
-    signupTab: labels?.signUpTab || labels?.signupTab || defaultLabels.signupTab,
-    signupTitle: labels?.signUpTitle || labels?.signupTitle || defaultLabels.signupTitle,
-    signupButton: labels?.signUpButton || labels?.signupButton || defaultLabels.signupButton
+    loginTab: labels?.signInTab ?? labels?.loginTab ?? defaultLabels.loginTab,
+    loginTitle: labels?.signInTitle ?? labels?.loginTitle ?? defaultLabels.loginTitle,
+    loginButton: labels?.signInButton ?? labels?.loginButton ?? defaultLabels.loginButton,
+    signupTab: labels?.signUpTab ?? labels?.signupTab ?? defaultLabels.signupTab,
+    signupTitle: labels?.signUpTitle ?? labels?.signupTitle ?? defaultLabels.signupTitle,
+    signupButton: labels?.signUpButton ?? labels?.signupButton ?? defaultLabels.signupButton
   };
   const themeColors = { ...defaultThemeColors[theme], ...colors };
   const primaryColor = branding?.primaryColor || themeColors.primary;
+  const secondStopColor = adjustColor(primaryColor, -15);
   let isGoogleEnabled = true;
   let isGithubEnabled = true;
   let isEmailPasswordEnabled = enableEmailPassword;
@@ -468,7 +493,7 @@ var UrAuth = ({
     } else if (typeof providers === "object") {
       isGoogleEnabled = !!providers.google;
       isGithubEnabled = !!providers.github;
-      isEmailPasswordEnabled = providers.emailPassword !== void 0 ? providers.emailPassword : false;
+      isEmailPasswordEnabled = providers.emailPassword !== void 0 ? providers.emailPassword : enableEmailPassword;
     }
   }
   const hasPasswordAuth = isEmailPasswordEnabled;
@@ -632,7 +657,7 @@ var UrAuth = ({
       width: "100%",
       padding: "14px",
       borderRadius: "0",
-      background: `linear-gradient(180deg, ${primaryColor} 0%, ${theme === "dark" ? "#111111" : "#111111"} 100%)`,
+      background: `linear-gradient(180deg, ${primaryColor} 0%, ${secondStopColor} 100%)`,
       color: themeColors.primaryText,
       fontSize: "15px",
       fontWeight: 600,
@@ -788,7 +813,7 @@ var UrAuth = ({
       ] }) }),
       (mode === "forgot" || mode === "reset") && /* @__PURE__ */ jsxs2("div", { style: { marginBottom: "24px", textAlign: "center" }, children: [
         /* @__PURE__ */ jsx4("h2", { style: { margin: "0 0 8px", fontSize: "20px", fontWeight: 700, color: themeColors.text }, children: mode === "forgot" ? text.forgotTitle : text.resetTitle }),
-        /* @__PURE__ */ jsx4("p", { style: { margin: 0, fontSize: "14px", color: themeColors.textMuted }, children: mode === "forgot" ? text.loginTitle : `Enter the code sent to ${email}` })
+        /* @__PURE__ */ jsx4("p", { style: { margin: 0, fontSize: "14px", color: themeColors.textMuted }, children: mode === "forgot" ? text.forgotSubtitle : text.resetSubtitle.replace("{email}", email) })
       ] }),
       !hasPasswordAuth && !hasSocialAuth && /* @__PURE__ */ jsx4("div", { style: { textAlign: "center", color: themeColors.textMuted, fontSize: "14px", lineHeight: 1.5 }, children: text.noAuthMethods }),
       hasPasswordAuth && /* @__PURE__ */ jsxs2("form", { onSubmit: handleSubmit, children: [
