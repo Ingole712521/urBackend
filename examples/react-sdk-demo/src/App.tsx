@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { UrAuth, ProtectedRoute, GuestRoute, useUser, UrUserButton } from '@urbackend/react';
+import { UrAuth, ProtectedRoute, GuestRoute, useUser, useAuth, UrUserButton } from '@urbackend/react';
 import './App.css';
 
 // Mini router component for the demo
@@ -28,7 +28,22 @@ function App() {
     return (
       <GuestRoute fallback={LoadingFallback} onRedirect={() => navigate('/')}>
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: '#f8fafc' }}>
-          <UrAuth providers={['google', 'github']} theme="light" />
+          <UrAuth
+            providers={{
+              github: true,
+              google: true,
+              emailPassword: true,
+            }}
+            branding={{
+              appName: "My Custom App",
+              logo: "https://vite.dev/logo.svg",
+              primaryColor: "#4F46E5",
+            }}
+            labels={{
+              signInTitle: "Welcome back to Custom App",
+              signInButton: "Proceed to App",
+            }}
+          />
         </div>
       </GuestRoute>
     );
@@ -43,7 +58,8 @@ function App() {
 }
 
 function Dashboard() {
-  const { user, logout } = useUser();
+  const { user } = useUser();
+  const { logout } = useAuth();
 
   return (
     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: '#f8fafc', padding: '24px' }}>
@@ -66,8 +82,8 @@ function Dashboard() {
       }}>
         
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '32px' }}>
-          {user?.avatarUrl ? (
-            <img src={user.avatarUrl} alt="Avatar" style={{ width: '64px', height: '64px', borderRadius: '0', objectFit: 'cover' }} />
+          {typeof user?.avatarUrl === 'string' && user?.avatarUrl ? (
+                <img src={user.avatarUrl } alt="Avatar" style={{ width: '64px', height: '64px', borderRadius: '0', objectFit: 'cover' }} />
           ) : (
             <div style={{ width: '64px', height: '64px', borderRadius: '0', background: 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', fontWeight: 600, color: '#64748b' }}>
               {user?.name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase()}

@@ -83,9 +83,74 @@ interface GuestRouteProps {
  */
 declare const GuestRoute: React.FC<GuestRouteProps>;
 
+type AuthProvider = 'google' | 'github';
+type ThemeMode = 'light' | 'dark';
+interface AuthColors {
+    background: string;
+    surface: string;
+    text: string;
+    textMuted: string;
+    border: string;
+    inputBackground: string;
+    primary: string;
+    primaryText: string;
+    footerBackground: string;
+    dividerText: string;
+    socialButtonBackground: string;
+}
+interface AuthBranding {
+    brandName?: string;
+    appName?: string;
+    title?: string;
+    subtitle?: string;
+    logo?: React.ReactNode | string;
+    primaryColor?: string;
+}
+interface AuthLabels {
+    loginTab: string;
+    signupTab: string;
+    loginTitle: string;
+    signupTitle: string;
+    forgotTitle: string;
+    resetTitle: string;
+    loginButton: string;
+    signupButton: string;
+    forgotButton: string;
+    resetButton: string;
+    emailLabel: string;
+    emailPlaceholder: string;
+    passwordLabel: string;
+    passwordPlaceholder: string;
+    nameLabel: string;
+    namePlaceholder: string;
+    otpLabel: string;
+    otpPlaceholder: string;
+    forgotPasswordLink: string;
+    socialDivider: string;
+    googleButton: string;
+    githubButton: string;
+    footerSigninPrompt: string;
+    footerSignupPrompt: string;
+    footerForgotPrompt: string;
+    noAuthMethods: string;
+    signInTitle?: string;
+    signUpTitle?: string;
+    signInTab?: string;
+    signUpTab?: string;
+    signInButton?: string;
+    signUpButton?: string;
+}
 interface UrAuthProps {
-    providers?: ('google' | 'github')[];
-    theme?: 'light' | 'dark';
+    providers?: AuthProvider[] | {
+        google?: boolean;
+        github?: boolean;
+        emailPassword?: boolean;
+    };
+    enableEmailPassword?: boolean;
+    theme?: ThemeMode;
+    colors?: Partial<AuthColors>;
+    branding?: AuthBranding;
+    labels?: Partial<AuthLabels>;
     onSuccess?: () => void;
 }
 declare const UrAuth: React.FC<UrAuthProps>;
