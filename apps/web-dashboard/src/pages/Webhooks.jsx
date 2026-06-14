@@ -203,7 +203,7 @@ export default function Webhooks() {
     setDeliveries([]);
     try {
       const res = await api.get(`/api/projects/${projectId}/webhooks/${webhook._id}/deliveries?limit=50`);
-      setDeliveries(res.data.data || []);
+      setDeliveries(res.data.data?.deliveries || []);
     } catch {
       toast.error('Failed to load delivery history');
     } finally {
