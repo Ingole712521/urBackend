@@ -27,6 +27,7 @@ const ApiAnalytics = require("./models/ApiAnalytics");
 const PlatformEvent = require("./models/PlatformEvent");
 const DeveloperActivity = require("./models/DeveloperActivity");
 const MailLog = require("./models/MailLog");
+const Invitation = require("./models/Invitation");
 
 // Queues
 const { authEmailQueue, initAuthEmailWorker } = require("./queues/authEmailQueue");
@@ -118,6 +119,7 @@ const ApiResponse = require("./utils/ApiResponse");
 const { checkLockout, recordFailedAttempt, clearLockout } = require("./utils/loginLockout");
 const { dispatchWebhooks } = require("./utils/webhookDispatcher");
 const { getDayKey, getMonthKey, getEndOfMonthTtlSeconds, incrWithTtlAtomic } = require("./utils/usageCounter");
+const { getProjectAccessQuery, getProjectRole } = require("./utils/projectAccess");
 
 module.exports = {
   connectDB,
@@ -131,6 +133,10 @@ module.exports = {
   Webhook,
   WebhookDelivery,
   ProRequest,
+  PlatformEvent,
+  DeveloperActivity,
+  MailLog,
+  Invitation,
   authEmailQueue,
   exportQueue,
   emailQueue,
@@ -204,9 +210,6 @@ module.exports = {
   ApiResponse,
   getPresignedUploadUrl,
   verifyUploadedFile,
-  PlatformEvent,
-  DeveloperActivity,
-  MailLog,
   activityRollupQueue,
   scheduleActivityRollup,
   initActivityRollupWorker,
@@ -226,5 +229,7 @@ module.exports = {
   getMonthKey,
   getEndOfMonthTtlSeconds,
   incrWithTtlAtomic,
-  getS3CompatibleStorage
+  getS3CompatibleStorage,
+  getProjectAccessQuery,
+  getProjectRole,
 };
