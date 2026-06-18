@@ -590,10 +590,10 @@ const Hyperspeed = ({ effectOptions = DEFAULT_EFFECT_OPTIONS }) => {
       }
 
       resume() {
-        if (this.paused) {
-          this.paused = false;
-          this.clock.getDelta();
-        }
+        if (this.disposed || !this.paused) return;
+        this.paused = false;
+        this.clock.getDelta();
+        requestAnimationFrame(this.tick);
       }
 
       dispose() {
@@ -652,12 +652,7 @@ const Hyperspeed = ({ effectOptions = DEFAULT_EFFECT_OPTIONS }) => {
       }
 
       tick() {
-        if (this.disposed) return;
-
-        if (this.paused) {
-          requestAnimationFrame(this.tick);
-          return;
-        }
+        if (this.disposed || this.paused) return;
 
         if (!this.hasValidSize) {
           const w = this.container.offsetWidth;
